@@ -84,6 +84,61 @@ def local_nlp_processing(text):
 MIN_SPEECH_DURATION_S = 0.5
 
 # ==============================
+# AUDIO VALIDATION
+# ==============================
+SUPPORTED_AUDIO_FORMATS = (".wav", ".mp3")
+
+
+class AudioValidationError(Exception):
+    """Audio ditolak pada tahap validasi, sebelum masuk pra-pemrosesan."""
+    pass
+
+
+def validate_audio(audio_path):
+    """Memvalidasi berkas audio sesuai tahap [2] pipeline penelitian.
+
+    Memeriksa keberadaan berkas, kesesuaian format, ukuran bukan 0 byte,
+    keterbacaan isi berkas, serta durasi lebih dari 0 detik. Mengembalikan
+    durasi rekaman dalam detik bila seluruh kriteria terpenuhi.
+    """
+    print("Mulai validasi audio...")
+
+    if not audio_path or not os.path.exists(audio_path):
+        raise AudioValidationError("File audio tidak ditemukan. Silakan unggah ulang.")
+
+    ext = os.path.splitext(audio_path)[1].lower()
+    if ext not in SUPPORTED_AUDIO_FORMATS:
+        raise AudioValidationError(
+            f"Format '{ext or 'tanpa ekstensi'}' tidak didukung. "
+            f"Gunakan {' atau '.join(SUPPORTED_AUDIO_FORMATS)}."
+        )
+
+    if os.path.getsize(audio_path) == 0:
+        raise AudioValidationError(
+            "File audio kosong (0 byte). Silakan unggah berkas yang benar-benar berisi rekaman."
+        )
+
+    # Ekstensi yang benar tidak menjamin isi berkas benar-benar audio. Pembacaan
+    # berkas di sini sekaligus menjadi pemeriksaan corrupt: berkas rusak atau
+    # berkas non-audio yang disamarkan akan gagal di titik ini.
+    try:
+        segment = AudioSegment.from_file(audio_path)
+    except Exception as e:
+        raise AudioValidationError(
+            f"File audio tidak dapat dibaca atau rusak (corrupt). Detail: {type(e).__name__}."
+        ) from e
+
+    duration = segment.duration_seconds
+    if duration <= 0:
+        raise AudioValidationError(
+            "Durasi rekaman 0 detik. Silakan unggah rekaman yang berisi suara."
+        )
+
+    print(f"Validasi audio lolos: format={ext}, durasi={duration:.2f} detik")
+    return duration
+
+
+# ==============================
 # AUDIO PRE-PROCESSING
 # ==============================
 def preprocess_audio(audio_path):
@@ -141,6 +196,15 @@ def asr_pipeline(audio_file, num_speakers_val):
 
     num_speakers = min(int(num_speakers_val), MAX_SPEAKERS)
     print("Mulai pipeline ASR dan Diarization...")
+
+    # Validasi Audio: berkas yang tidak layak dihentikan di sini agar tidak
+    # menimbulkan kesalahan pada tahap pemrosesan berikutnya.
+    try:
+        validate_audio(audio_file)
+    except AudioValidationError as e:
+        pesan = f"❌ VALIDASI GAGAL: {e}"
+        print(pesan)
+        return pesan, pesan, pesan
 
     # Pra-pemrosesan Audio
     processed_audio = preprocess_audio(audio_file)

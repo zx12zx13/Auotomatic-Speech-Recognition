@@ -5,7 +5,7 @@ Status realisasi produk terhadap proposal. Rencana lengkap ada di [PLANNING.md](
 **Tanggal peninjauan**: 16 Juli 2026 (diperbarui setelah Iterasi 1 selesai)
 **Basis peninjauan**: `app.py`, `main.py`, `requirements.txt`, `templates/`, riwayat git (5 commit).
 
-**Status iterasi**: Iterasi 1 (Stabilkan MVP Pipeline) — ✅ **selesai & terverifikasi**. Iterasi 2–8 belum mulai.
+**Status iterasi**: Iterasi 1 (Stabilkan MVP Pipeline) dan Iterasi 2 (Validasi Audio) — ✅ **selesai & terverifikasi**. Iterasi 3–8 belum mulai.
 
 ---
 
@@ -25,7 +25,7 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 
 | # | Kebutuhan | Status | Keterangan |
 |---|---|---|---|
-| 1 | Menerima input rekaman audio | ✅ Selesai | `gr.Audio(type="filepath")` di `app.py`. Hanya upload; perekaman langsung lewat sistem belum ada |
+| 1 | Menerima input rekaman audio | ✅ Selesai | `gr.Audio(type="filepath")` + `validate_audio()` (format, ukuran, durasi, corrupt). Hanya upload; perekaman langsung lewat sistem belum ada |
 | 2 | Pra-pemrosesan audio (normalisasi + noise reduction) | ✅ Selesai | BUG-01 diperbaiki & diuji: puncak amplitudo audio uji naik 0,135 → 0,989 dan `reduce_noise` berjalan |
 | 3 | Speaker diarization maks. 5 pembicara | ✅ Selesai | Konstanta `MAX_SPEAKERS = 5`, ditegakkan di slider **dan** di `asr_pipeline()` via `min()` |
 | 4 | Transkripsi ASR | ✅ Selesai | Whisper "medium", termasuk timestamp per segmen |
@@ -51,7 +51,7 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 | Tahap | Status |
 |---|---|
 | [1] Akuisisi Audio | ✅ Upload jalan; rekam langsung belum ada |
-| [2] Validasi Audio | ❌ Tidak ada pengecekan format/ukuran/durasi/corrupt |
+| [2] Validasi Audio | ✅ `validate_audio()` — format, ukuran ≠ 0 byte, durasi > 0, deteksi corrupt |
 | [3] Normalisasi Volume | ✅ Berjalan (BUG-01 diperbaiki) |
 | [4] Noise Reduction | ✅ Berjalan (BUG-01 diperbaiki) |
 | [5] VAD | ✅ Implisit di Whisper & Pyannote, sesuai desain proposal |
@@ -155,10 +155,26 @@ Perlu dirapikan sebelum sidang:
 
 1. **Cabut token Hugging Face yang bocor** (BUG-02) — satu-satunya sisa Iterasi 1, dan hanya bisa Anda lakukan sendiri. Terbitkan token baru lalu isi `.env`.
 2. ~~Perbaiki BUG-01, BUG-04, BUG-05, BUG-06~~ — ✅ selesai & terverifikasi.
-3. **Kerjakan Iterasi 3 (Evaluasi LLM + rubrik Gemini)** — ini penentu apakah penelitian punya kontribusi ilmiah. Butuh `GEMINI_API_KEY` di `.env`.
-4. Iterasi 2 (Validasi Audio), lalu Iterasi 4 (Pra-pemrosesan Teks sesuai proposal).
-5. Iterasi 5 (Database) → Iterasi 6 (Histori & Penilaian nyata).
-6. Iterasi 7 (Black Box, White Box, UAT) → Iterasi 8 (pengukuran objektivitas vs guru).
+3. ~~Iterasi 2 (Validasi Audio)~~ — ✅ selesai & terverifikasi.
+4. **Kerjakan Iterasi 3 (Evaluasi LLM + rubrik Gemini)** — ini penentu apakah penelitian punya kontribusi ilmiah. Butuh `GEMINI_API_KEY` di `.env`.
+5. Iterasi 4 (Pra-pemrosesan Teks sesuai proposal).
+6. Iterasi 5 (Database) → Iterasi 6 (Histori & Penilaian nyata).
+7. Iterasi 7 (Black Box, White Box, UAT) → Iterasi 8 (pengukuran objektivitas vs guru).
+
+### Bukti Verifikasi Iterasi 2
+
+`validate_audio()` diuji terhadap kriteria "selesai" di PLANNING.md:
+
+| Kasus uji | Hasil |
+|---|---|
+| Berkas tidak ada | ✅ Ditolak — "File audio tidak ditemukan" |
+| Format `.txt` | ✅ Ditolak — "Format '.txt' tidak didukung. Gunakan .wav atau .mp3" |
+| Berkas 0 byte | ✅ Ditolak — "File audio kosong (0 byte)" |
+| Berkas `.txt` disamarkan jadi `.wav` | ✅ Ditolak — "tidak dapat dibaca atau rusak (corrupt)" |
+| Durasi 0 detik | ✅ Ditolak — "Durasi rekaman 0 detik" |
+| `.wav` valid 2 detik | ✅ Lolos — durasi terbaca 2,00 detik |
+
+Dukungan `.mp3` juga diverifikasi: ffmpeg tersedia di sistem dan libsndfile 1.2.2 mampu membaca mp3, sehingga `.mp3` berjalan dari validasi hingga pra-pemrosesan tanpa fallback ke audio mentah.
 
 ## Catatan Terbuka
 
