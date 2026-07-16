@@ -2,8 +2,6 @@ import os
 import warnings
 import gradio as gr
 import whisper
-import re
-from collections import Counter
 from pyannote.audio import Pipeline
 from pyannote.core import Segment, Annotation
 import soundfile as sf
@@ -12,6 +10,7 @@ from pydub import AudioSegment, effects
 from dotenv import load_dotenv
 
 from evaluator import evaluate_response, format_hasil, EvaluationError
+from text_preprocessing import susun_teks_pembicara, daftar_pembicara
 
 # WAJIB untuk Windows
 os.environ["SB_NO_SYMLINK"] = "1"
@@ -63,25 +62,6 @@ def pyannote_diarization(audio_path, num_speakers):
     finally:
         diarization_pipeline.parameters(instantiated=True)["clustering"]["metric"] = original_metric
     return diarization
-
-# ==============================
-# NLP AUTO CORRECTION (OPTIONAL)
-# ==============================
-def local_nlp_processing(text):
-    if not text: return "Tidak ada teks."
-    kamus = {
-        r"\bgak\b": "tidak", r"\bnggak\b": "tidak", r"\bkalo\b": "kalau",
-        r"\byg\b": "yang", r"\bgimana\b": "bagaimana", r"\bak\b": "aku", r"\bsy\b": "saya"
-    }
-    corrected = text
-    for p, rpl in kamus.items():
-        corrected = re.sub(p, rpl, corrected, flags=re.IGNORECASE)
-    words = re.findall(r"\b\w+\b", corrected.lower())
-    most_common = Counter(words).most_common(5)
-    output = f"--- ✅ HASIL KOREKSI ---\n{corrected}\n\n---  KATA TERBANYAK ---\n"
-    for w, c in most_common:
-        output += f"- {w}: {c}\n"
-    return output
 
 MIN_SPEECH_DURATION_S = 0.5
 
@@ -192,7 +172,7 @@ def preprocess_audio(audio_path):
 # ==============================
 # CORE PROCESSING PIPELINE
 # ==============================
-def asr_pipeline(audio_file, num_speakers_val, topik=""):
+def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1):
     if not audio_file:
         pesan = "Tidak ada file audio."
         return pesan, pesan, pesan, pesan
@@ -232,6 +212,7 @@ def asr_pipeline(audio_file, num_speakers_val, topik=""):
         speaker_map = {label: f"Pembicara {i+1}" for i, label in enumerate(sorted_labels)}
         
         dialogue = ""
+        segmen_terstruktur = []
         for segment in result["segments"]:
             seg_start, seg_end = segment['start'], segment['end']
             speaker_durations = {}
@@ -239,18 +220,46 @@ def asr_pipeline(audio_file, num_speakers_val, topik=""):
                 intersection = turn & Segment(seg_start, seg_end)
                 if intersection:
                     speaker_durations[speaker_label] = speaker_durations.get(speaker_label, 0) + intersection.duration
-            
+
             if speaker_durations:
                 dominant_speaker_label = max(speaker_durations, key=speaker_durations.get)
                 speaker_name = speaker_map.get(dominant_speaker_label, "TIDAK DIKETAHUI")
             else:
                 speaker_name = "TIDAK DIKETAHUI"
-                
+
             dialogue += f"[{speaker_name}]: {segment['text'].strip()}\n\n"
+            # Segmen disimpan terstruktur agar dapat disusun ulang menurut waktu
+            # dan disaring per pembicara pada tahap pra-pemrosesan teks.
+            segmen_terstruktur.append({
+                "pembicara": speaker_name,
+                "mulai": seg_start,
+                "selesai": seg_end,
+                "teks": segment['text'].strip(),
+            })
         print("Pipeline diarization selesai.")
 
-        # 3. Proses NLP Lokal
-        nlp_result = local_nlp_processing(full_text)
+        # 3. Pra-pemrosesan Teks (tahap [9])
+        print("Mulai pra-pemrosesan teks...")
+        pembicara_ada = daftar_pembicara(segmen_terstruktur)
+        target = f"Pembicara {int(pembicara_dinilai)}" if int(pembicara_dinilai) > 0 else None
+
+        if target and target not in pembicara_ada:
+            teks_siswa = ""
+            nlp_result = (
+                f"⚠️ {target} tidak ditemukan dalam rekaman.\n\n"
+                f"Pembicara yang terdeteksi: {', '.join(pembicara_ada) or '(tidak ada)'}\n\n"
+                f"Pilih nomor pembicara yang sesuai, atau isi 0 untuk menilai seluruh pembicara."
+            )
+        else:
+            teks_siswa = susun_teks_pembicara(segmen_terstruktur, target)
+            label = target or "seluruh pembicara"
+            nlp_result = (
+                f"=== TEKS HASIL PRA-PEMROSESAN ({label}) ===\n\n{teks_siswa}\n\n"
+                f"=== INFORMASI ===\n"
+                f"Pembicara terdeteksi: {', '.join(pembicara_ada) or '(tidak ada)'}\n"
+                f"Teks di atas inilah yang dinilai oleh sistem."
+            )
+        print(f"Pra-pemrosesan teks selesai. Target: {target or 'semua pembicara'}")
 
         # 4. Evaluasi LLM berbasis rubrik
         # Kegagalan evaluasi tidak boleh membatalkan transkripsi yang sudah
@@ -261,10 +270,17 @@ def asr_pipeline(audio_file, num_speakers_val, topik=""):
                 "Isi kolom 'Topik / Pertanyaan' lalu proses ulang untuk memperoleh "
                 "skor dan umpan balik."
             )
+        elif not teks_siswa:
+            eval_result = (
+                "❌ Tidak ada teks yang dapat dinilai.\n\n"
+                "Periksa tab 'Pra-pemrosesan Teks' untuk melihat pembicara yang terdeteksi."
+            )
         else:
             try:
                 print("Mulai evaluasi LLM...")
-                hasil = evaluate_response(topik, full_text)
+                # Yang dinilai adalah teks hasil pra-pemrosesan milik pembicara
+                # yang dievaluasi, bukan transkrip mentah seluruh pembicara.
+                hasil = evaluate_response(topik, teks_siswa)
                 eval_result = format_hasil(hasil)
                 print(f"Evaluasi selesai. Skor akhir: {hasil['skor_akhir']}")
             except EvaluationError as e:
@@ -298,6 +314,11 @@ def create_unified_app():
                     info="Dasar penilaian oleh sistem. Wajib diisi untuk memperoleh skor."
                 )
                 num_speakers_input = gr.Slider(minimum=0, maximum=MAX_SPEAKERS, step=1, value=0, label=f"Jumlah Pembicara (0 = Otomatis, maks. {MAX_SPEAKERS})")
+                pembicara_input = gr.Slider(
+                    minimum=0, maximum=MAX_SPEAKERS, step=1, value=1,
+                    label="Pembicara yang Dinilai",
+                    info="Nomor pembicara yang merupakan siswa. Isi 0 untuk menilai seluruh pembicara."
+                )
                 submit_btn = gr.Button(" Proses Audio", variant="primary")
 
             with gr.Column(scale=2):
@@ -308,12 +329,12 @@ def create_unified_app():
                         dialogue_out = gr.Textbox(lines=15, label="Dialog Berdasarkan Pembicara")
                     with gr.TabItem("Transkrip Penuh"):
                         full_text_out = gr.Textbox(lines=15, label="Hasil Transkrip Lengkap")
-                    with gr.TabItem("Analisis NLP"):
-                        nlp_out = gr.Textbox(lines=15, label="Koreksi & Analisis Teks")
+                    with gr.TabItem("Pra-pemrosesan Teks"):
+                        nlp_out = gr.Textbox(lines=15, label="Teks Bersih yang Dinilai Sistem")
 
         submit_btn.click(
             fn=asr_pipeline,
-            inputs=[audio_input, num_speakers_input, topik_input],
+            inputs=[audio_input, num_speakers_input, topik_input, pembicara_input],
             outputs=[dialogue_out, full_text_out, nlp_out, eval_out]
         )
     return demo

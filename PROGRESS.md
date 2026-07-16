@@ -5,7 +5,7 @@ Status realisasi produk terhadap proposal. Rencana lengkap ada di [PLANNING.md](
 **Tanggal peninjauan**: 16 Juli 2026 (diperbarui setelah Iterasi 1 selesai)
 **Basis peninjauan**: `app.py`, `main.py`, `requirements.txt`, `templates/`, riwayat git (5 commit).
 
-**Status iterasi**: Iterasi 1 (Stabilkan MVP Pipeline) dan Iterasi 2 (Validasi Audio) — ✅ **selesai & terverifikasi**. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 4–8 belum mulai.
+**Status iterasi**: Iterasi 1 (MVP Pipeline), Iterasi 2 (Validasi Audio), dan Iterasi 4 (Pra-pemrosesan Teks) — ✅ **selesai & terverifikasi**. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 5–8 belum mulai.
 
 ---
 
@@ -29,7 +29,7 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 | 2 | Pra-pemrosesan audio (normalisasi + noise reduction) | ✅ Selesai | BUG-01 diperbaiki & diuji: puncak amplitudo audio uji naik 0,135 → 0,989 dan `reduce_noise` berjalan |
 | 3 | Speaker diarization maks. 5 pembicara | ✅ Selesai | Konstanta `MAX_SPEAKERS = 5`, ditegakkan di slider **dan** di `asr_pipeline()` via `min()` |
 | 4 | Transkripsi ASR | ✅ Selesai | Whisper "medium", termasuk timestamp per segmen |
-| 5 | Pra-pemrosesan teks | ❌ Tidak sesuai | Yang ada: kamus slang regex + penghitung 5 kata terbanyak. Tidak satupun diminta proposal |
+| 5 | Pra-pemrosesan teks | ✅ Selesai | `text_preprocessing.py`: spasi berlebih, karakter asing, kata pengisi, pengulangan ASR, kapitalisasi kalimat, normalisasi slang, penyusunan ulang per waktu & per pembicara |
 | 6 | **Evaluasi otomatis berbasis rubrik** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | `evaluator.py`: rubrik Tabel 3.1 sebagai data, prompt terstruktur, Gemini structured output. Butuh `GEMINI_API_KEY` |
 | 7 | **Menghasilkan skor + umpan balik naratif** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | Skor per indikator + skor akhir (rata-rata) + umpan balik; tampil di tab "Penilaian" |
 | 8 | Menyimpan & menampilkan hasil evaluasi | ❌ Palsu | Histori & Penilaian berisi data dummy hardcoded (`rapat_q3_2023.mp3`, dll.) |
@@ -58,7 +58,7 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 | [6] Speaker Change Detection | ✅ Implisit di Pyannote, sesuai desain proposal |
 | [7] Speaker Diarization | ✅ Pyannote 3.1 + filter `MIN_SPEECH_DURATION_S = 0.5` + pemetaan ke "Pembicara 1/2/…" |
 | [8] Transkripsi | ✅ Whisper medium |
-| [9] Pra-pemrosesan Teks | ❌ Yang ada bukan yang diminta proposal |
+| [9] Pra-pemrosesan Teks | ✅ `text_preprocessing.py` sesuai §3.2.2 poin 9 |
 | [10] **Evaluasi LLM** | ⚠️ `evaluator.py` selesai; menunggu `GEMINI_API_KEY` untuk uji end-to-end |
 
 ---
@@ -157,7 +157,7 @@ Perlu dirapikan sebelum sidang:
 2. ~~Perbaiki BUG-01, BUG-04, BUG-05, BUG-06~~ — ✅ selesai & terverifikasi.
 3. ~~Iterasi 2 (Validasi Audio)~~ — ✅ selesai & terverifikasi.
 4. **Isi `GEMINI_API_KEY` di `.env`, lalu uji Iterasi 3 end-to-end.** Kodenya sudah siap, tetapi belum pernah menyentuh Gemini API sungguhan — lihat "Bukti Verifikasi Iterasi 3" di bawah untuk daftar apa yang sudah dan belum teruji.
-5. Iterasi 4 (Pra-pemrosesan Teks sesuai proposal).
+5. ~~Iterasi 4 (Pra-pemrosesan Teks)~~ — ✅ selesai & terverifikasi.
 6. Iterasi 5 (Database) → Iterasi 6 (Histori & Penilaian nyata).
 7. Iterasi 7 (Black Box, White Box, UAT) → Iterasi 8 (pengukuran objektivitas vs guru).
 
@@ -206,9 +206,44 @@ Dukungan `.mp3` juga diverifikasi: ffmpeg tersedia di sistem dan libsndfile 1.2.
 
 ### Keterbatasan yang Diketahui pada Iterasi 3
 
-1. **Evaluasi memakai transkrip penuh (`full_text`), bukan teks khusus siswa.** Bila rekaman memuat suara guru, ucapan guru ikut dinilai. §3.2.2 poin 9 proposal mensyaratkan teks disusun ulang dan "memfokuskan pada pembicara yang menjadi objek evaluasi" — ini baru akan tertangani di **Iterasi 4**. Sampai saat itu, gunakan rekaman yang hanya berisi suara siswa agar hasil penilaian sahih.
+1. ~~**Evaluasi memakai transkrip penuh (`full_text`), bukan teks khusus siswa.**~~ — ✅ **teratasi di Iterasi 4.** Yang dinilai kini teks hasil pra-pemrosesan milik pembicara yang dievaluasi saja.
 2. **Belum ada penyimpanan hasil evaluasi.** Skor dan umpan balik hanya tampil di layar dan hilang setelah proses berikutnya (menunggu Iterasi 5).
 3. **Belum ada mekanisme percobaan ulang (retry).** Kegagalan sementara API langsung dilaporkan sebagai gagal. Ini disengaja agar kegagalan terlihat, bukan tersamar.
+
+### Bukti Verifikasi Iterasi 4
+
+Seluruh pengujian berjalan tanpa memerlukan API maupun model, sehingga Iterasi 4 **terverifikasi penuh**.
+
+**Kriteria "selesai" PLANNING.md** — teks mentah Whisper menjadi teks terstruktur siap dinilai:
+
+```
+SEBELUM : 'eee  saya   akan   menjelaskan  tentang gak  paham  yg   namanya
+           fotosintesis   hmm  itu itu itu proses  tumbuhan'
+SESUDAH : 'Saya akan menjelaskan tentang tidak paham yang namanya fotosintesis
+           itu proses tumbuhan.'
+```
+
+| Aspek | Hasil |
+|---|---|
+| Spasi berlebih dihapus | ✅ |
+| Kata pengisi (eee, hmm, anu) dihapus | ✅ |
+| Slang → baku (gak→tidak, yg→yang, kalo→kalau) | ✅ |
+| Pengulangan ASR 3× beruntun dihapus | ✅ `saya saya saya belajar` → `saya belajar` |
+| Pengulangan 2× sengaja dibiarkan | ✅ `sangat sangat baik` tetap utuh |
+| Kapitalisasi awal tiap kalimat | ✅ `ini satu. ini dua` → `Ini satu. Ini dua.` |
+| Spasi sebelum tanda baca dirapikan | ✅ `halo dunia . apa kabar` → `Halo dunia. Apa kabar.` |
+| Teks kosong ditangani | ✅ Mengembalikan string kosong |
+
+**Penyusunan ulang per waktu & per pembicara** (simulasi rekaman guru + siswa, segmen sengaja diacak: 6,0s → 10,0s → 0,0s → 14,0s):
+
+| Aspek | Hasil |
+|---|---|
+| Teks siswa terurut menurut waktu | ✅ Segmen 0,0s mendahului 10,0s |
+| Ucapan guru tidak ikut dinilai | ✅ Terverifikasi |
+| Mode seluruh pembicara (target 0) | ✅ Menggabungkan semua, tetap terurut waktu |
+| Pembicara target tidak ditemukan | ✅ Mengembalikan kosong + memberi tahu guru, **tidak** diam-diam menilai pembicara lain |
+| Daftar segmen kosong | ✅ Ditangani |
+| Jumlah kembalian pipeline = output Gradio | ✅ Ketiga jalur `return` konsisten 4 nilai |
 
 ## Catatan Terbuka
 
