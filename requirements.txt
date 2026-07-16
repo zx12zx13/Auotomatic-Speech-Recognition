@@ -1,0 +1,29 @@
+# Core numeric
+numpy==1.26.4
+numba>=0.59
+
+# PyTorch (CPU – stabil untuk Python 3.10)
+torch==2.0.1
+torchaudio==2.0.2
+
+# ASR
+openai-whisper
+
+# Speaker diarization
+pyannote.audio==3.1.1
+speechbrain>=0.5.14
+torch-audiomentations==0.11.0
+# Hugging Face (kompatibel dengan pyannote 3.1.1)
+huggingface_hub==0.20.3
+
+# UI
+gradio==3.50.2
+
+# Audio processing
+pydub
+noisereduce
+soundfile
+
+# Konfigurasi
+python-dotenv
+

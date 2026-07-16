@@ -1,0 +1,12 @@
+# Kredensial - JANGAN pernah di-commit
+.env
+
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Berkas audio sementara hasil pra-pemrosesan
+*_processed.wav

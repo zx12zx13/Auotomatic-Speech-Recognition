@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Portal Edukasi Audio</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+        :root {
+            --primary-color: #2a6fdb;
+            --secondary-color: #1a5bb8;
+            --background-color: #f4f7fc;
+            --sidebar-bg: #ffffff;
+            --widget-bg: #ffffff;
+            --text-color: #333;
+            --heading-color: #102a43;
+            --subtle-text: #627d98;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            color: var(--text-color);
+            display: flex;
+        }
+
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            border-right: 1px solid var(--border-color);
+            padding: 1.5rem;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            padding: 0.9rem 1rem;
+            color: var(--subtle-text);
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .sidebar-nav a:hover, .sidebar-nav a.active {
+            background-color: #eaf1fb;
+            color: var(--primary-color);
+        }
+        .sidebar-nav a .icon {
+            margin-right: 1rem;
+            font-size: 1.2rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .user-profile {
+            margin-top: auto;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1.5rem;
+            display: flex;
+            align-items: center;
+        }
+        .user-profile .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            margin-right: 1rem;
+        }
+        .user-profile .username {
+            font-weight: 500;
+        }
+
+
+        .main-wrapper {
+            margin-left: 260px;
+            width: calc(100% - 260px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: var(--widget-bg);
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            color: var(--heading-color);
+            margin: 0;
+        }
+        
+        .logout-form button {
+            background: var(--primary-color);
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 0.7rem 1.4rem;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .logout-form button:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .content {
+            padding: 2rem;
+        }
+
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .info-card {
+            background-color: var(--widget-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+        }
+        .info-card h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--subtle-text);
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        .info-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--heading-color);
+        }
+
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .module-card {
+            background-color: var(--widget-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .module-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 7px 14px rgba(0,0,0,0.08);
+        }
+
+        .module-card .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 1.5rem;
+            height: auto;
+            border: none;
+        }
+        .module-card .header h2 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+
+        .module-card .body {
+            padding: 1.5rem;
+            flex-grow: 1;
+        }
+        .module-card .body p {
+            margin: 0 0 1.5rem 0;
+            line-height: 1.6;
+            color: var(--subtle-text);
+        }
+
+        .module-card .footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            text-align: right;
+        }
+        .module-card .footer a {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.6rem 1.2rem;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .module-card .footer a:hover {
+            background-color: var(--secondary-color);
+        }
+
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="logo">Sistem Evaluasi</div>
+        <nav class="sidebar-nav">
+            <a href="/" class="active"><span class="icon"></span> Dashboard</a>
+            <a href="/app/analisis"><span class="icon"></span> Analisis Audio</a>
+            <a href="/app/histori"><span class="icon"></span> Histori</a>
+            <a href="/app/nilai"><span class="icon"></span> Penilaian</a>
+        </nav>
+        <div class="user-profile">
+            <div class="avatar">{{ user.username[0] | upper }}</div>
+            <div class="username">{{ user.username }}</div>
+        </div>
+    </aside>
+
+    <div class="main-wrapper">
+        <header class="header">
+            <h1>Dashboard Utama</h1>
+            <form class="logout-form" action="/logout" method="post">
+                <button type="submit">Logout</button>
+            </form>
+        </header>
+
+        <main class="content">
+            <section class="info-cards">
+                <div class="info-card">
+                    <h3>Proses Bulan Ini</h3>
+                    <p class="value">12</p>
+                </div>
+                <div class="info-card">
+                    <h3>Skor Rata-Rata</h3>
+                    <p class="value">91%</p>
+                </div>
+                <div class="info-card">
+                    <h3>Pengguna Aktif</h3>
+                    <p class="value">1</p>
+                </div>
+                <div class="info-card">
+                    <h3>Modul Tersedia</h3>
+                    <p class="value">3</p>
+                </div>
+            </section>
+
+            <section class="module-grid">
+                <div class="module-card">
+                    <div class="header"><h2> Modul Analisis Audio</h2></div>
+                    <div class="body">
+                        <p>Unggah file audio untuk transkripsi, identifikasi pembicara, dan analisis teks dalam satu antarmuka terpadu.</p>
+                    </div>
+                    <div class="footer"><a href="/app/analisis">Buka Modul</a></div>
+                </div>
+
+                <div class="module-card">
+                    <div class="header"><h2> Histori & Arsip</h2></div>
+                    <div class="body">
+                        <p>Akses kembali semua pekerjaan yang telah Anda selesaikan. Tinjau transkrip dan hasil diarisasi sebelumnya.</p>
+                    </div>
+                    <div class="footer"><a href="/app/histori">Lihat Arsip</a></div>
+                </div>
+
+                <div class="module-card">
+                    <div class="header"><h2> Penilaian & Umpan Balik</h2></div>
+                    <div class="body">
+                        <p>Gunakan model AI canggih untuk menilai akurasi transkrip Anda dan dapatkan umpan balik untuk perbaikan.</p>
+                    </div>
+                    <div class="footer"><a href="/app/nilai">Lihat Penilaian</a></div>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
