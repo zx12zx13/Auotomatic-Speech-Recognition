@@ -24,6 +24,9 @@ pydub
 noisereduce
 soundfile
 
+# Evaluator LLM
+google-genai
+
 # Konfigurasi
 python-dotenv
 

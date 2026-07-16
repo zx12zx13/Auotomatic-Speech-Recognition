@@ -11,6 +11,8 @@ import noisereduce as nr
 from pydub import AudioSegment, effects
 from dotenv import load_dotenv
 
+from evaluator import evaluate_response, format_hasil, EvaluationError
+
 # WAJIB untuk Windows
 os.environ["SB_NO_SYMLINK"] = "1"
 os.environ["TORCH_AUDIOMENTATIONS_DISABLE_WARNINGS"] = "1"
@@ -190,9 +192,10 @@ def preprocess_audio(audio_path):
 # ==============================
 # CORE PROCESSING PIPELINE
 # ==============================
-def asr_pipeline(audio_file, num_speakers_val):
+def asr_pipeline(audio_file, num_speakers_val, topik=""):
     if not audio_file:
-        return "Tidak ada file audio.", "Tidak ada file audio.", "Tidak ada file audio."
+        pesan = "Tidak ada file audio."
+        return pesan, pesan, pesan, pesan
 
     num_speakers = min(int(num_speakers_val), MAX_SPEAKERS)
     print("Mulai pipeline ASR dan Diarization...")
@@ -204,7 +207,7 @@ def asr_pipeline(audio_file, num_speakers_val):
     except AudioValidationError as e:
         pesan = f"❌ VALIDASI GAGAL: {e}"
         print(pesan)
-        return pesan, pesan, pesan
+        return pesan, pesan, pesan, pesan
 
     # Pra-pemrosesan Audio
     processed_audio = preprocess_audio(audio_file)
@@ -248,16 +251,35 @@ def asr_pipeline(audio_file, num_speakers_val):
 
         # 3. Proses NLP Lokal
         nlp_result = local_nlp_processing(full_text)
-        
+
+        # 4. Evaluasi LLM berbasis rubrik
+        # Kegagalan evaluasi tidak boleh membatalkan transkripsi yang sudah
+        # berhasil: guru tetap perlu melihat transkrip walau penilaian gagal.
+        if not topik or not topik.strip():
+            eval_result = (
+                "Topik atau pertanyaan belum diisi.\n\n"
+                "Isi kolom 'Topik / Pertanyaan' lalu proses ulang untuk memperoleh "
+                "skor dan umpan balik."
+            )
+        else:
+            try:
+                print("Mulai evaluasi LLM...")
+                hasil = evaluate_response(topik, full_text)
+                eval_result = format_hasil(hasil)
+                print(f"Evaluasi selesai. Skor akhir: {hasil['skor_akhir']}")
+            except EvaluationError as e:
+                eval_result = f"❌ EVALUASI GAGAL: {e}"
+                print(eval_result)
+
         print("Semua proses selesai.")
-        
+
     finally:
         # Hapus file audio yang diproses
         if processed_audio != audio_file and os.path.exists(processed_audio):
             os.remove(processed_audio)
             print(f"File sementara {processed_audio} dihapus.")
 
-    return dialogue.strip(), full_text, nlp_result
+    return dialogue.strip(), full_text, nlp_result, eval_result
 
 # ==============================
 # GRADIO UNIFIED INTERFACE
@@ -269,11 +291,19 @@ def create_unified_app():
         with gr.Row():
             with gr.Column(scale=1):
                 audio_input = gr.Audio(label="Upload Audio", type="filepath")
+                topik_input = gr.Textbox(
+                    lines=3,
+                    label="Topik / Pertanyaan",
+                    placeholder="Contoh: Jelaskan proses fotosintesis pada tumbuhan.",
+                    info="Dasar penilaian oleh sistem. Wajib diisi untuk memperoleh skor."
+                )
                 num_speakers_input = gr.Slider(minimum=0, maximum=MAX_SPEAKERS, step=1, value=0, label=f"Jumlah Pembicara (0 = Otomatis, maks. {MAX_SPEAKERS})")
                 submit_btn = gr.Button(" Proses Audio", variant="primary")
-            
+
             with gr.Column(scale=2):
                 with gr.Tabs():
+                    with gr.TabItem("Penilaian"):
+                        eval_out = gr.Textbox(lines=15, label="Skor & Umpan Balik (Rubrik)")
                     with gr.TabItem("Dialog"):
                         dialogue_out = gr.Textbox(lines=15, label="Dialog Berdasarkan Pembicara")
                     with gr.TabItem("Transkrip Penuh"):
@@ -283,8 +313,8 @@ def create_unified_app():
 
         submit_btn.click(
             fn=asr_pipeline,
-            inputs=[audio_input, num_speakers_input],
-            outputs=[dialogue_out, full_text_out, nlp_out]
+            inputs=[audio_input, num_speakers_input, topik_input],
+            outputs=[dialogue_out, full_text_out, nlp_out, eval_out]
         )
     return demo
 

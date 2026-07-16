@@ -5,7 +5,7 @@ Status realisasi produk terhadap proposal. Rencana lengkap ada di [PLANNING.md](
 **Tanggal peninjauan**: 16 Juli 2026 (diperbarui setelah Iterasi 1 selesai)
 **Basis peninjauan**: `app.py`, `main.py`, `requirements.txt`, `templates/`, riwayat git (5 commit).
 
-**Status iterasi**: Iterasi 1 (Stabilkan MVP Pipeline) dan Iterasi 2 (Validasi Audio) — ✅ **selesai & terverifikasi**. Iterasi 3–8 belum mulai.
+**Status iterasi**: Iterasi 1 (Stabilkan MVP Pipeline) dan Iterasi 2 (Validasi Audio) — ✅ **selesai & terverifikasi**. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 4–8 belum mulai.
 
 ---
 
@@ -30,8 +30,8 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 | 3 | Speaker diarization maks. 5 pembicara | ✅ Selesai | Konstanta `MAX_SPEAKERS = 5`, ditegakkan di slider **dan** di `asr_pipeline()` via `min()` |
 | 4 | Transkripsi ASR | ✅ Selesai | Whisper "medium", termasuk timestamp per segmen |
 | 5 | Pra-pemrosesan teks | ❌ Tidak sesuai | Yang ada: kamus slang regex + penghitung 5 kata terbanyak. Tidak satupun diminta proposal |
-| 6 | **Evaluasi otomatis berbasis rubrik** | ❌ **Belum ada** | Tidak ada kode Gemini, tidak ada prompt, tidak ada rubrik |
-| 7 | **Menghasilkan skor + umpan balik naratif** | ❌ **Belum ada** | Konsekuensi dari #6 |
+| 6 | **Evaluasi otomatis berbasis rubrik** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | `evaluator.py`: rubrik Tabel 3.1 sebagai data, prompt terstruktur, Gemini structured output. Butuh `GEMINI_API_KEY` |
+| 7 | **Menghasilkan skor + umpan balik naratif** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | Skor per indikator + skor akhir (rata-rata) + umpan balik; tampil di tab "Penilaian" |
 | 8 | Menyimpan & menampilkan hasil evaluasi | ❌ Palsu | Histori & Penilaian berisi data dummy hardcoded (`rapat_q3_2023.mp3`, dll.) |
 
 ## Status Kebutuhan Non-Fungsional
@@ -59,7 +59,7 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 | [7] Speaker Diarization | ✅ Pyannote 3.1 + filter `MIN_SPEECH_DURATION_S = 0.5` + pemetaan ke "Pembicara 1/2/…" |
 | [8] Transkripsi | ✅ Whisper medium |
 | [9] Pra-pemrosesan Teks | ❌ Yang ada bukan yang diminta proposal |
-| [10] **Evaluasi LLM** | ❌ **Belum dikerjakan** |
+| [10] **Evaluasi LLM** | ⚠️ `evaluator.py` selesai; menunggu `GEMINI_API_KEY` untuk uji end-to-end |
 
 ---
 
@@ -156,7 +156,7 @@ Perlu dirapikan sebelum sidang:
 1. **Cabut token Hugging Face yang bocor** (BUG-02) — satu-satunya sisa Iterasi 1, dan hanya bisa Anda lakukan sendiri. Terbitkan token baru lalu isi `.env`.
 2. ~~Perbaiki BUG-01, BUG-04, BUG-05, BUG-06~~ — ✅ selesai & terverifikasi.
 3. ~~Iterasi 2 (Validasi Audio)~~ — ✅ selesai & terverifikasi.
-4. **Kerjakan Iterasi 3 (Evaluasi LLM + rubrik Gemini)** — ini penentu apakah penelitian punya kontribusi ilmiah. Butuh `GEMINI_API_KEY` di `.env`.
+4. **Isi `GEMINI_API_KEY` di `.env`, lalu uji Iterasi 3 end-to-end.** Kodenya sudah siap, tetapi belum pernah menyentuh Gemini API sungguhan — lihat "Bukti Verifikasi Iterasi 3" di bawah untuk daftar apa yang sudah dan belum teruji.
 5. Iterasi 4 (Pra-pemrosesan Teks sesuai proposal).
 6. Iterasi 5 (Database) → Iterasi 6 (Histori & Penilaian nyata).
 7. Iterasi 7 (Black Box, White Box, UAT) → Iterasi 8 (pengukuran objektivitas vs guru).
@@ -175,6 +175,40 @@ Perlu dirapikan sebelum sidang:
 | `.wav` valid 2 detik | ✅ Lolos — durasi terbaca 2,00 detik |
 
 Dukungan `.mp3` juga diverifikasi: ffmpeg tersedia di sistem dan libsndfile 1.2.2 mampu membaca mp3, sehingga `.mp3` berjalan dari validasi hingga pra-pemrosesan tanpa fallback ke audio mentah.
+
+### Bukti Verifikasi Iterasi 3 — ⚠️ SEBAGIAN
+
+**Sudah teruji** (tanpa memanggil Gemini API):
+
+| Aspek | Hasil |
+|---|---|
+| Prompt memuat seluruh isi rubrik | ✅ 16/16 deskriptor dan 4/4 nama indikator masuk ke prompt |
+| Topik guru & jawaban siswa masuk prompt | ✅ Keduanya terverifikasi |
+| Skor akhir = rata-rata 4 indikator | ✅ Skor 4,3,2,3 → 3.0 |
+| Skor di luar skala (7) ditolak | ✅ "berada di luar skala rubrik (1-4)" |
+| Skor nol ditolak | ✅ Ditolak |
+| Skor bukan bilangan bulat ditolak | ✅ Ditolak |
+| Medan skor hilang ditolak | ✅ Ditolak |
+| Keluaran bukan objek JSON ditolak | ✅ Ditolak |
+| Topik/jawaban kosong ditolak | ✅ Ditolak sebelum memanggil API |
+| Tanpa `GEMINI_API_KEY` gagal dengan pesan jelas | ✅ Ditolak |
+| Jumlah nilai kembalian pipeline = jumlah output Gradio | ✅ Ketiga jalur `return` konsisten 4 nilai |
+
+**BELUM teruji** — memerlukan `GEMINI_API_KEY`:
+
+- Pemanggilan Gemini API sungguhan (nama model, autentikasi, kuota).
+- Apakah `response_schema` benar-benar dipatuhi model dan `response.text` berisi JSON sesuai skema.
+- Kualitas dan kewajaran skor yang dihasilkan terhadap jawaban siswa nyata.
+- **Konsistensi skor antar pemanggilan** — `temperature=0.0` sudah diatur untuk tujuan ini, tetapi konsistensi nyata wajib diukur karena menjadi klaim utama penelitian.
+- Alur penuh dari unggah audio hingga tab "Penilaian" lewat UI Gradio.
+
+> **Catatan kejujuran akademik**: selama poin-poin di atas belum diuji, Iterasi 3 **belum boleh dinyatakan selesai** di laporan skripsi. Kriteria "selesai" pada PLANNING.md mensyaratkan satu transkrip menghasilkan 4 skor + umpan balik yang konsisten pada pemanggilan berulang — dan hal itu belum pernah dijalankan.
+
+### Keterbatasan yang Diketahui pada Iterasi 3
+
+1. **Evaluasi memakai transkrip penuh (`full_text`), bukan teks khusus siswa.** Bila rekaman memuat suara guru, ucapan guru ikut dinilai. §3.2.2 poin 9 proposal mensyaratkan teks disusun ulang dan "memfokuskan pada pembicara yang menjadi objek evaluasi" — ini baru akan tertangani di **Iterasi 4**. Sampai saat itu, gunakan rekaman yang hanya berisi suara siswa agar hasil penilaian sahih.
+2. **Belum ada penyimpanan hasil evaluasi.** Skor dan umpan balik hanya tampil di layar dan hilang setelah proses berikutnya (menunggu Iterasi 5).
+3. **Belum ada mekanisme percobaan ulang (retry).** Kegagalan sementara API langsung dilaporkan sebagai gagal. Ini disengaja agar kegagalan terlihat, bukan tersamar.
 
 ## Catatan Terbuka
 
