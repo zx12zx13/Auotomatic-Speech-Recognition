@@ -1,3 +1,5 @@
+import secrets
+
 import gradio as gr
 from fastapi import FastAPI, Request, Form, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -6,31 +8,35 @@ from pydantic import BaseModel
 
 # Impor fungsi untuk membuat aplikasi Gradio dari app.py
 from app import create_unified_app
+import database as db
+from session import sesi_aktif
 
 # --- Konfigurasi ---
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# Basis data pengguna "palsu" untuk menyimpan pengguna terdaftar
-# Dalam aplikasi nyata, ini akan menjadi database (misalnya, SQL, MongoDB)
-fake_user_db = {
-    "admin": "password"  # Tambahkan pengguna admin default
-}
+# Menyiapkan tabel basis data saat aplikasi dimuat.
+db.init_db()
 
 
 # --- Model untuk data login ---
 class User(BaseModel):
+    id_user: int
     username: str
 
-# --- "Session" sangat sederhana ---
-fake_session_db = {}
 
 def get_current_user(request: Request):
-    """Dependensi untuk memeriksa apakah pengguna sudah 'login'."""
-    username = request.cookies.get("session-id")
-    if username not in fake_session_db:
+    """Dependensi untuk memeriksa apakah pengguna sudah login."""
+    token = request.cookies.get("session-id")
+    if not token:
         return None
-    return User(username=username)
+    id_user = sesi_aktif.get(token)
+    if id_user is None:
+        return None
+    row = db.ambil_user(id_user)
+    if not row:
+        return None
+    return User(id_user=row["id_user"], username=row["username"])
 
 # --- Mounting Aplikasi Gradio (di path baru) ---
 unified_app_gradio = create_unified_app()
@@ -156,35 +162,42 @@ async def handle_registration(request: Request, username: str = Form(...), passw
             "request": request,
             "error": "Password tidak cocok."
         })
-    if username in fake_user_db:
+
+    try:
+        db.buat_user(username, password)
+    except ValueError as e:
         return templates.TemplateResponse("register.html", {
             "request": request,
-            "error": "Username sudah digunakan."
+            "error": str(e)
         })
-    
-    # Simpan pengguna baru
-    fake_user_db[username] = password
-    
+
     # Redirect ke halaman login dengan pesan sukses
     return RedirectResponse(url="/login?success=Registrasi+berhasil!+Silakan+login.", status_code=303)
 
 @app.post("/login")
 async def handle_login(request: Request, username: str = Form(...), password: str = Form(...)):
-    # Periksa apakah pengguna ada di DB dan passwordnya cocok
-    if username in fake_user_db and fake_user_db[username] == password:
-        response = RedirectResponse(url="/", status_code=303)
-        # "Session" dibuat dengan menyimpan nama pengguna di cookie
-        fake_session_db[username] = True
-        response.set_cookie(key="session-id", value=username, httponly=True)
-        return response
-    else:
+    id_user = db.verifikasi_user(username, password)
+    if id_user is None:
         return templates.TemplateResponse("login.html", {
             "request": request,
             "error": "Username atau password salah."
         })
 
+    # Token sesi dibuat acak. Nilai cookie tidak boleh dapat ditebak: bila
+    # cookie berisi username, siapa pun dapat memalsukannya dan masuk tanpa
+    # kata sandi.
+    token = secrets.token_urlsafe(32)
+    sesi_aktif[token] = id_user
+
+    response = RedirectResponse(url="/", status_code=303)
+    response.set_cookie(key="session-id", value=token, httponly=True, samesite="lax")
+    return response
+
 @app.post("/logout")
-async def logout():
+async def logout(request: Request):
+    token = request.cookies.get("session-id")
+    # Sesi dihapus dari sisi server, bukan sekadar menghapus cookie di peramban.
+    sesi_aktif.pop(token, None)
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie(key="session-id")
     return response

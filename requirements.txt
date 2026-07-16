@@ -27,6 +27,9 @@ soundfile
 # Evaluator LLM
 google-genai
 
+# Basis data & keamanan
+bcrypt
+
 # Konfigurasi
 python-dotenv
 

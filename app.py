@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 
 from evaluator import evaluate_response, format_hasil, EvaluationError
 from text_preprocessing import susun_teks_pembicara, daftar_pembicara
+from session import id_user_dari_token
+import database as db
 
 # WAJIB untuk Windows
 os.environ["SB_NO_SYMLINK"] = "1"
@@ -172,7 +174,8 @@ def preprocess_audio(audio_path):
 # ==============================
 # CORE PROCESSING PIPELINE
 # ==============================
-def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1):
+def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
+                 request: gr.Request = None):
     if not audio_file:
         pesan = "Tidak ada file audio."
         return pesan, pesan, pesan, pesan
@@ -183,7 +186,7 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1):
     # Validasi Audio: berkas yang tidak layak dihentikan di sini agar tidak
     # menimbulkan kesalahan pada tahap pemrosesan berikutnya.
     try:
-        validate_audio(audio_file)
+        durasi_audio = validate_audio(audio_file)
     except AudioValidationError as e:
         pesan = f"❌ VALIDASI GAGAL: {e}"
         print(pesan)
@@ -264,6 +267,9 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1):
         # 4. Evaluasi LLM berbasis rubrik
         # Kegagalan evaluasi tidak boleh membatalkan transkripsi yang sudah
         # berhasil: guru tetap perlu melihat transkrip walau penilaian gagal.
+        # `hasil` diinisialisasi agar tahap penyimpanan tetap aman ketika
+        # evaluasi tidak dilakukan atau gagal.
+        hasil = None
         if not topik or not topik.strip():
             eval_result = (
                 "Topik atau pertanyaan belum diisi.\n\n"
@@ -286,6 +292,39 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1):
             except EvaluationError as e:
                 eval_result = f"❌ EVALUASI GAGAL: {e}"
                 print(eval_result)
+
+        # 5. Penyimpanan ke basis data
+        # Kegagalan penyimpanan tidak boleh membuang hasil yang sudah dihitung:
+        # guru tetap melihat transkrip dan skor, disertai pemberitahuan bahwa
+        # hasil tersebut tidak terdokumentasi.
+        id_user = id_user_dari_token(request.cookies.get("session-id")) if request else None
+        if id_user is None:
+            eval_result += (
+                "\n\n⚠️ Hasil TIDAK tersimpan: sesi login tidak terdeteksi. "
+                "Buka modul ini melalui aplikasi (login terlebih dahulu) agar "
+                "hasil masuk ke histori."
+            )
+        else:
+            try:
+                id_audio = db.simpan_hasil(
+                    id_user=id_user,
+                    filename=os.path.basename(audio_file),
+                    durasi=durasi_audio,
+                    segmen=segmen_terstruktur,
+                    full_text=full_text,
+                    corrected_text=teks_siswa,
+                    topik=topik or None,
+                    hasil_evaluasi=hasil,
+                    pembicara_dinilai=target,
+                )
+                print(f"Hasil tersimpan ke basis data (id_audio={id_audio}).")
+                eval_result += f"\n\n✅ Hasil tersimpan ke histori (ID: {id_audio})."
+            except Exception as e:
+                print(f"PERINGATAN: penyimpanan ke basis data GAGAL ({type(e).__name__}: {e}).")
+                eval_result += (
+                    f"\n\n⚠️ Hasil TIDAK tersimpan ke histori "
+                    f"({type(e).__name__}). Transkrip dan skor di atas tetap sahih."
+                )
 
         print("Semua proses selesai.")
 

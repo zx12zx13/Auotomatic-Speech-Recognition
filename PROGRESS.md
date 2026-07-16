@@ -5,7 +5,7 @@ Status realisasi produk terhadap proposal. Rencana lengkap ada di [PLANNING.md](
 **Tanggal peninjauan**: 16 Juli 2026 (diperbarui setelah Iterasi 1 selesai)
 **Basis peninjauan**: `app.py`, `main.py`, `requirements.txt`, `templates/`, riwayat git (5 commit).
 
-**Status iterasi**: Iterasi 1 (MVP Pipeline), Iterasi 2 (Validasi Audio), dan Iterasi 4 (Pra-pemrosesan Teks) — ✅ **selesai & terverifikasi**. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 5–8 belum mulai.
+**Status iterasi**: Iterasi 1 (MVP Pipeline), 2 (Validasi Audio), 4 (Pra-pemrosesan Teks), dan 5 (Database) — ✅ **selesai & terverifikasi**. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 6–8 belum mulai.
 
 ---
 
@@ -32,7 +32,7 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 | 5 | Pra-pemrosesan teks | ✅ Selesai | `text_preprocessing.py`: spasi berlebih, karakter asing, kata pengisi, pengulangan ASR, kapitalisasi kalimat, normalisasi slang, penyusunan ulang per waktu & per pembicara |
 | 6 | **Evaluasi otomatis berbasis rubrik** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | `evaluator.py`: rubrik Tabel 3.1 sebagai data, prompt terstruktur, Gemini structured output. Butuh `GEMINI_API_KEY` |
 | 7 | **Menghasilkan skor + umpan balik naratif** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | Skor per indikator + skor akhir (rata-rata) + umpan balik; tampil di tab "Penilaian" |
-| 8 | Menyimpan & menampilkan hasil evaluasi | ❌ Palsu | Histori & Penilaian berisi data dummy hardcoded (`rapat_q3_2023.mp3`, dll.) |
+| 8 | Menyimpan & menampilkan hasil evaluasi | ⚠️ Menyimpan ✅, menampilkan ❌ | `database.py`: 6 tabel SQLite, penyimpanan bertahap audio→speaker→transcript→segment→assessment. Halaman Histori & Penilaian **masih dummy** (menunggu Iterasi 6) |
 
 ## Status Kebutuhan Non-Fungsional
 
@@ -40,9 +40,9 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 |---|---|---|---|
 | 1 | Antarmuka sederhana untuk guru | ✅ Sebagian | Dashboard + sidebar + modul Gradio ter-mount sudah berjalan |
 | 2 | Tidak butuh perangkat khusus | ⚠️ | Whisper "medium" berat di CPU. Perlu diukur waktu prosesnya untuk audio 5–10 menit |
-| 3 | Hasil konsisten & terdokumentasi | ❌ | Tidak ada dokumentasi hasil karena tidak ada database |
+| 3 | Hasil konsisten & terdokumentasi | ⚠️ | Terdokumentasi ✅ (tersimpan di basis data, dapat ditelusuri). Konsistensi skor belum diukur — menunggu uji Iterasi 3 |
 | 4 | Modular | ✅ | `local_nlp_processing`, `pyannote_diarization`, `preprocess_audio`, `asr_pipeline` terpisah rapi |
-| 5 | **Keamanan data audio & hasil evaluasi** | ❌ **Kritis** | Lihat BUG-02 dan BUG-03 |
+| 5 | **Keamanan data audio & hasil evaluasi** | ✅ Selesai | Kredensial di `.env` (BUG-02), password bcrypt (BUG-03), token sesi acak (BUG-07), isolasi data antar guru pada seluruh query |
 
 ---
 
@@ -76,20 +76,22 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 
 ---
 
-## Status Database (§3.2.3.3)
+## Status Database (§3.2.3.3) — ✅ SELESAI
 
-**Belum ada database sama sekali.** Tidak ada engine SQL, ORM, migrasi, maupun file `.db`.
+Diimplementasikan di `database.py` memakai SQLite (`sqlite3` pustaka standar, tanpa dependensi ORM tambahan). Berkas basis data dapat diatur lewat `DB_PATH` di `.env`, default `evaluasi.db`.
 
 | Tabel | Status |
 |---|---|
-| `user` | ❌ Diganti `fake_user_db = {"admin": "password"}` di memori |
-| `audio` | ❌ Belum ada |
-| `speaker` | ❌ Belum ada |
-| `transcript` | ❌ Belum ada |
-| `segment` | ❌ Belum ada |
-| `assessment` | ❌ Belum ada |
+| `user` | ✅ Password bcrypt, username unik |
+| `audio` | ✅ Termasuk `duration` dari hasil validasi & `status` |
+| `speaker` | ✅ `total_duration` dihitung otomatis dari segmen |
+| `transcript` | ✅ `full_text` (mentah) + `corrected_text` (hasil pra-pemrosesan) |
+| `segment` | ✅ Terhubung ke `speaker` dan `transcript` |
+| `assessment` | ✅ + kolom skor per indikator (lihat catatan) |
 
-Konsekuensi: seluruh akun dan hasil analisis **hilang setiap kali server di-restart**. Klaim proposal bahwa "sistem menyimpan setiap hasil proses ke dalam database secara bertahap" (§3.2.3.2, Histori Transkrip) belum terpenuhi.
+**Penyesuaian terhadap proposal**: tabel `assessment` diberi kolom tambahan `score_relevansi`, `score_konsep`, `score_kelengkapan`, `score_koherensi`, dan `topik`. Proposal hanya menyediakan satu kolom `score`, padahal rubrik memiliki 4 indikator — tanpa kolom ini, analisis objektivitas per indikator (RM #2) tidak dapat dilakukan. **Relasi antar tabel tidak berubah**, sehingga Gambar 3.13 tetap berlaku; hanya daftar atribut pada Tabel 3.8 yang perlu diperbarui di proposal.
+
+Klaim proposal bahwa "sistem menyimpan setiap hasil proses ke dalam database secara bertahap" (§3.2.3.2) kini terpenuhi: penyimpanan mengikuti urutan audio → speaker → transcript → segment → assessment, seluruhnya dalam satu transaksi.
 
 ---
 
@@ -123,8 +125,15 @@ Token sudah dikeluarkan dari `app.py` dan kini dibaca via `os.getenv("HUGGINGFAC
 
 **Saran yang tetap berlaku**: cabut token lama di https://huggingface.co/settings/tokens dan terbitkan token baru untuk diisikan ke `.env`. Ini kehati-hatian wajar karena token sempat tersimpan sebagai teks polos di berkas kerja, bukan karena ada kebocoran publik.
 
-### BUG-03 — Password disimpan dan dibandingkan dalam bentuk plaintext (Tinggi, keamanan) — *terbuka*
-`main.py:174` membandingkan `fake_user_db[username] == password` secara langsung. Perlu hashing (`bcrypt`) saat implementasi tabel `user` di Iterasi 5.
+### ✅ BUG-03 — Password disimpan dan dibandingkan dalam bentuk plaintext (Tinggi, keamanan) — **DIPERBAIKI**
+`main.py` sebelumnya membandingkan `fake_user_db[username] == password` secara langsung. Kini kata sandi di-hash dengan **bcrypt** (`database.buat_user`) dan diperiksa dengan `bcrypt.checkpw` (`database.verifikasi_user`).
+Verifikasi: kata sandi tersimpan berformat `$2b$12$...`, bukan teks polos; login dengan kata sandi benar berhasil, kata sandi salah dan pengguna tidak dikenal ditolak. `verifikasi_user` sengaja tidak membedakan "username tidak ada" dan "password salah" agar daftar pengguna terdaftar tidak bocor.
+
+### ✅ BUG-07 — Cookie sesi berisi username sehingga dapat dipalsukan (Kritis, keamanan) — **DIPERBAIKI**
+**Ditemukan saat Iterasi 5.** `main.py` sebelumnya menyetel `set_cookie("session-id", value=username)` dan memvalidasi sesi hanya dengan memeriksa apakah username ada di `fake_session_db`. Akibatnya **siapa pun dapat mengarang cookie `session-id=admin` di peramban dan langsung masuk tanpa kata sandi** — autentikasi praktis dapat dilewati sepenuhnya.
+
+Perbaikan: token sesi kini dibuat acak dengan `secrets.token_urlsafe(32)` dan dipetakan ke `id_user` di sisi server (`session.py`). Logout menghapus token dari server, bukan sekadar menghapus cookie di peramban.
+Verifikasi via `TestClient`: cookie `bu_intan` dan `admin` ditolak (redirect ke login); login sah menghasilkan token acak 43 karakter yang bukan username; token yang sudah logout ditolak.
 
 ### ✅ BUG-04 — `app.py` tidak bisa dijalankan langsung (Rendah) — **DIPERBAIKI**
 Blok `if __name__ == "__main__":` ditambahkan; `python app.py` kini meluncurkan modul analisis Gradio secara mandiri, sesuai klaim di `GEMINI.md`. Untuk aplikasi penuh tetap gunakan `uvicorn main:app --reload`.
@@ -157,9 +166,38 @@ Perlu dirapikan sebelum sidang:
 2. ~~Perbaiki BUG-01, BUG-04, BUG-05, BUG-06~~ — ✅ selesai & terverifikasi.
 3. ~~Iterasi 2 (Validasi Audio)~~ — ✅ selesai & terverifikasi.
 4. **Isi `GEMINI_API_KEY` di `.env`, lalu uji Iterasi 3 end-to-end.** Kodenya sudah siap, tetapi belum pernah menyentuh Gemini API sungguhan — lihat "Bukti Verifikasi Iterasi 3" di bawah untuk daftar apa yang sudah dan belum teruji.
-5. ~~Iterasi 4 (Pra-pemrosesan Teks)~~ — ✅ selesai & terverifikasi.
-6. Iterasi 5 (Database) → Iterasi 6 (Histori & Penilaian nyata).
+5. ~~Iterasi 4 (Pra-pemrosesan Teks)~~ dan ~~Iterasi 5 (Database)~~ — ✅ selesai & terverifikasi.
+6. Iterasi 6 (Histori & Penilaian nyata) — mengganti tabel dummy di `main.py` dengan query `database.ambil_histori()` dan `database.ambil_penilaian()` yang sudah siap pakai.
 7. Iterasi 7 (Black Box, White Box, UAT) → Iterasi 8 (pengukuran objektivitas vs guru).
+
+### Bukti Verifikasi Iterasi 5
+
+Seluruh pengujian berjalan tanpa memerlukan API maupun model, sehingga Iterasi 5 **terverifikasi penuh**.
+
+**Kriteria "selesai" PLANNING.md** — hasil evaluasi bertahan setelah server di-restart: ✅ **terbukti**. Data ditulis oleh satu proses Python, lalu dibaca kembali oleh **proses Python yang benar-benar baru** (tanpa state di memori): histori, penilaian, transkrip, dan ketiga segmen terbaca utuh.
+
+| Aspek | Hasil |
+|---|---|
+| Password ter-hash bcrypt, bukan plaintext | ✅ Format `$2b$12$...` |
+| Login benar / salah / user tidak ada | ✅ Ketiganya sesuai harapan |
+| Username ganda ditolak | ✅ |
+| Penyimpanan bertahap 5 tabel | ✅ audio 1, speaker 2, transcript 1, segment 3, assessment 1 |
+| `total_duration` per pembicara dihitung dari segmen | ✅ P1 = 12,0s (5+7), P2 = 3,0s |
+| Skor per indikator tersimpan | ✅ (4, 3, 2, 3), skor akhir 3.0 |
+| Pembicara yang dinilai tercatat di `assessment` | ✅ "Pembicara 1" |
+| Data bertahan setelah restart | ✅ Dibaca dari proses baru |
+| Guru lain tidak melihat histori guru lain | ✅ 0 baris |
+| Guru lain menebak `id_audio` milik guru lain | ✅ Mengembalikan `None` |
+| Keutuhan transaksi saat gagal di tengah | ✅ Foreign key gagal → **tidak ada data setengah jadi** |
+| Evaluasi gagal → transkrip tetap tersimpan | ✅ `assessment` kosong, `transcript` tetap ada |
+| Cookie sesi palsu ditolak (BUG-07) | ✅ Diuji via `TestClient` |
+| Logout mematikan sesi di sisi server | ✅ Token lama ditolak |
+
+### Keterbatasan yang Diketahui pada Iterasi 5
+
+1. **Sesi disimpan di memori, bukan basis data.** Proposal tidak memuat tabel sesi, sehingga guru perlu login ulang setiap kali server dimulai kembali. Data hasil evaluasi tidak terpengaruh.
+2. **`filepath` belum diisi.** Berkas audio unggahan belum disalin ke penyimpanan tetap, sehingga kolom `filepath` pada tabel `audio` masih kosong dan audio asli tidak dapat diputar ulang dari histori. Perlu diputuskan apakah rekaman siswa memang layak disimpan permanen — ini menyangkut data pribadi siswa dan sebaiknya dibicarakan dengan pembimbing serta pihak sekolah.
+3. **Penyimpanan bergantung pada sesi login.** Bila modul Gradio dibuka langsung (misalnya lewat `python app.py`, di luar shell FastAPI), sesi tidak terdeteksi dan hasil tidak tersimpan. Sistem memberi tahu hal ini secara eksplisit di tab Penilaian, bukan diam-diam membuang hasil.
 
 ### Bukti Verifikasi Iterasi 2
 

@@ -10,3 +10,7 @@ __pycache__/
 
 # Berkas audio sementara hasil pra-pemrosesan
 *_processed.wav
+
+# Basis data - memuat data siswa dan hasil penilaian, tidak boleh di-commit
+*.db
+*.db-journal
