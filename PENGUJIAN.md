@@ -4,7 +4,8 @@ Dokumentasi pelaksanaan pengujian §3.2.5 proposal: **Black Box**, **White Box**
 dan **UAT**. Kode uji ada di folder `tests/`; skenario mengikuti **Lampiran 5**
 proposal (BB-001 s.d. BB-023, WB-001 s.d. WB-023).
 
-**Terakhir dijalankan**: 17 Juli 2026 — `49 uji otomatis, semuanya lolos`.
+**Terakhir dijalankan**: 17 Juli 2026 — `67 uji otomatis, semuanya lolos`
+(49 Black Box + White Box, 18 uji perhitungan objektivitas Iterasi 8).
 
 ## Cara Menjalankan
 
@@ -124,6 +125,7 @@ Skrip menghitung P total, per aspek, dan per pertanyaan.
 | Black Box | 17/23 skenario + 2 tambahan | 6 skenario butuh model/API |
 | White Box | 16/23 jalur (22 metode uji) | 6 jalur di dalam model; 1 tidak berlaku |
 | UAT | Instrumen + skrip hitung siap | Pengambilan data responden |
+| Objektivitas (Iterasi 8) | 18 uji rumus, cocok dengan sklearn/scipy | Skor sistem nyata + skor guru buta — lihat [OBJEKTIVITAS.md](OBJEKTIVITAS.md) |
 
 **Sebelum sidang**: jalankan skenario UJI MANUAL end-to-end (isi `.env`,
 proses audio sungguhan lewat UI, catat hasil di kolom "Hasil" Lampiran 5),

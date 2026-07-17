@@ -2,10 +2,12 @@
 
 Status realisasi produk terhadap proposal. Rencana lengkap ada di [PLANNING.md](PLANNING.md).
 
-**Tanggal peninjauan**: 17 Juli 2026 (diperbarui setelah Iterasi 7 — bagian otomatis — selesai)
-**Basis peninjauan**: `app.py`, `main.py`, `evaluator.py`, `text_preprocessing.py`, `database.py`, `session.py`, `templates/`, `tests/`, riwayat git.
+**Tanggal peninjauan**: 17 Juli 2026 (diperbarui setelah seluruh 8 iterasi dikerjakan)
+**Basis peninjauan**: `app.py`, `main.py`, `evaluator.py`, `text_preprocessing.py`, `database.py`, `session.py`, `objektivitas.py`, `uat_hitung.py`, `templates/`, `tests/`, riwayat git.
 
-**Status iterasi**: Iterasi 1 (MVP Pipeline), 2 (Validasi Audio), 4 (Pra-pemrosesan Teks), 5 (Database), dan 6 (Histori & Penilaian nyata) — ✅ **selesai & terverifikasi**. Iterasi 7 (Pengujian) — ⚠️ **bagian otomatis selesai** (49 uji lolos, lihat [PENGUJIAN.md](PENGUJIAN.md)); skenario yang butuh model/API dan UAT responden guru masih menunggu. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 8 belum mulai.
+**Status iterasi**: Iterasi 1 (MVP Pipeline), 2 (Validasi Audio), 4 (Pra-pemrosesan Teks), 5 (Database), dan 6 (Histori & Penilaian nyata) — ✅ **selesai & terverifikasi**. Iterasi 7 (Pengujian) dan 8 (Objektivitas) — ⚠️ **perangkatnya selesai & terverifikasi, datanya belum ada**: 67 uji otomatis lolos, tetapi skenario yang butuh model/API, data UAT dari guru, dan skor manual guru **hanya dapat dikumpulkan oleh peneliti** (lihat [PENGUJIAN.md](PENGUJIAN.md) dan [OBJEKTIVITAS.md](OBJEKTIVITAS.md)). Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi).
+
+> **Satu penghalang menahan tiga iterasi sekaligus.** `GEMINI_API_KEY` yang belum diisi memblokir Iterasi 3 (uji end-to-end), sisa Iterasi 7 (skenario manual BB-018/BB-019), dan Iterasi 8 (butuh skor sistem sungguhan untuk dibandingkan). Ini prioritas tunggal berikutnya.
 
 ---
 
@@ -101,7 +103,7 @@ Klaim proposal bahwa "sistem menyimpan setiap hasil proses ke dalam database sec
 | Black Box | ⚠️ 17/23 skenario Lampiran 5 lolos otomatis (`tests/test_blackbox.py`); 6 skenario butuh model/API → uji manual |
 | White Box | ⚠️ 16/23 jalur Lampiran 5 lolos otomatis (`tests/test_whitebox.py`); 6 jalur implisit di model; WB-007 tidak berlaku |
 | UAT (10 pertanyaan, responden guru) | ⚠️ Instrumen + skrip hitung (`uat_hitung.py`) siap; **pengambilan data responden belum** |
-| Pengukuran objektivitas vs penilaian manual guru (RM #2) | ❌ Belum dilaksanakan (Iterasi 8) |
+| Pengukuran objektivitas vs penilaian manual guru (RM #2) | ⚠️ Alat + rumus siap & terverifikasi (`objektivitas.py`); **pengambilan skor guru belum** — lihat [OBJEKTIVITAS.md](OBJEKTIVITAS.md) |
 
 Rincian lengkap per TC-ID, penyesuaian terhadap Lampiran 5, dan cara menjalankan ada di [PENGUJIAN.md](PENGUJIAN.md). Jalankan dengan `python -m unittest discover -s tests`.
 
@@ -183,7 +185,40 @@ Perlu dirapikan sebelum sidang:
 6. ~~Iterasi 6 (Histori & Penilaian nyata)~~ — ✅ selesai & terverifikasi.
 7. ~~Iterasi 7 — bagian otomatis (Black Box + White Box)~~ — ✅ selesai, 49 uji lolos.
 8. **Iterasi 7 — bagian manual**: jalankan skenario bertanda "UJI MANUAL" di [PENGUJIAN.md](PENGUJIAN.md) (butuh `.env` terisi), lalu kumpulkan data UAT dari guru dan hitung dengan `uat_hitung.py`. **Hanya Anda yang bisa melakukan ini** — instrumen dan skrip perhitungannya sudah siap, datanya wajib berasal dari responden sungguhan.
-9. Iterasi 8 (pengukuran objektivitas vs guru).
+9. **Iterasi 8 — pengambilan data objektivitas**: setelah beberapa rekaman diproses, jalankan `python objektivitas.py --ekspor`, minta guru menilai rekaman yang sama **secara buta** (tanpa melihat skor sistem), lalu hitung. Prosedur lengkap di [OBJEKTIVITAS.md](OBJEKTIVITAS.md).
+
+### Bukti Verifikasi Iterasi 8 — ⚠️ ALAT TERVERIFIKASI, DATA BELUM ADA
+
+`python -m unittest tests.test_objektivitas` → **18 uji lolos**. Rumus Kappa ditulis sendiri (bukan memanggil pustaka) agar dapat disalin dan dipertanggungjawabkan di BAB III/IV; kebenarannya diverifikasi dua arah.
+
+| Aspek | Hasil |
+|---|---|
+| Cohen's Kappa vs contoh hitung tangan | ✅ Matriks klasik → κ = 0,400 tepat |
+| Cohen's Kappa vs `sklearn.metrics.cohen_kappa_score` | ✅ 50 perbandingan acak, cocok sampai 9 desimal |
+| Quadratic Weighted Kappa vs sklearn (`weights="quadratic"`) | ✅ 50 perbandingan acak, cocok sampai 9 desimal |
+| Korelasi Pearson vs `scipy.stats.pearsonr` | ✅ Cocok sampai 9 desimal |
+| Kesepakatan sempurna → κ = 1,0 | ✅ |
+| QWK > Kappa saat selisih hanya 1 tingkat | ✅ Sesuai sifat ordinal rubrik |
+| Kappa tidak terdefinisi (Pe = 1) | ✅ Dilaporkan `n/a`, **tidak** dipaksa 0 atau 1 |
+| Paradoks Kappa (persis tinggi tapi κ rendah) | ✅ Terdeteksi & diperingatkan otomatis |
+| Baris terisi sebagian ditolak | ✅ Tidak dihitung sebagian |
+| Skor di luar skala / bukan angka ditolak | ✅ |
+| `--ekspor` mengosongkan kolom guru | ✅ Diuji — sistem tidak boleh menyarankan skor guru |
+| Peringatan n < 30 | ✅ Otomatis |
+
+**BELUM ada** — hanya dapat dikumpulkan peneliti:
+
+- **Skor sistem sungguhan** (butuh `GEMINI_API_KEY` + rekaman siswa nyata).
+- **Skor manual guru secara buta** atas rekaman yang sama.
+- Karena itu **tidak ada satu pun angka objektivitas yang sah saat ini**.
+
+> **Catatan kejujuran akademik**: angka yang muncul saat menguji rumus (mis. QWK 0,799 dari 5 baris contoh) berasal dari data karangan untuk memverifikasi perhitungan, **bukan hasil penelitian**. Angka itu tidak boleh masuk BAB IV dalam bentuk apa pun.
+
+### Keterbatasan yang Diketahui pada Iterasi 8
+
+1. **Alat ini luring dan tidak punya rute web.** `--ekspor` membaca seluruh tabel `assessment` lintas guru, sehingga sengaja tidak diberi antarmuka web — jaminan isolasi data antar guru pada aplikasi tetap utuh. Dijalankan peneliti atas basis datanya sendiri.
+2. **Kesepakatan antar-guru belum difasilitasi.** Skrip membandingkan sistem vs satu kolom guru. Bila melibatkan >1 guru (sangat disarankan, lihat OBJEKTIVITAS.md), perbandingan guru-vs-guru perlu dijalankan terpisah dengan menyalin kolom.
+3. **Ambang kelayakan belum ditetapkan.** Kategori Landis & Koch (1977) dipakai sebagai rujukan umum, tetapi proposal tidak menetapkan kriteria minimum. Harus disepakati dengan pembimbing **sebelum** melihat hasil.
 
 ### Bukti Verifikasi Iterasi 7 — ⚠️ SEBAGIAN (bagian otomatis penuh)
 
