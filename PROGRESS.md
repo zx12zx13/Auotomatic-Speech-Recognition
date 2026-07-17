@@ -2,22 +2,20 @@
 
 Status realisasi produk terhadap proposal. Rencana lengkap ada di [PLANNING.md](PLANNING.md).
 
-**Tanggal peninjauan**: 16 Juli 2026 (diperbarui setelah Iterasi 1 selesai)
-**Basis peninjauan**: `app.py`, `main.py`, `requirements.txt`, `templates/`, riwayat git (5 commit).
+**Tanggal peninjauan**: 17 Juli 2026 (diperbarui setelah Iterasi 6 selesai)
+**Basis peninjauan**: `app.py`, `main.py`, `evaluator.py`, `text_preprocessing.py`, `database.py`, `session.py`, `templates/`, riwayat git.
 
-**Status iterasi**: Iterasi 1 (MVP Pipeline), 2 (Validasi Audio), 4 (Pra-pemrosesan Teks), dan 5 (Database) — ✅ **selesai & terverifikasi**. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 6–8 belum mulai.
+**Status iterasi**: Iterasi 1 (MVP Pipeline), 2 (Validasi Audio), 4 (Pra-pemrosesan Teks), 5 (Database), dan 6 (Histori & Penilaian nyata) — ✅ **selesai & terverifikasi**. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 7–8 belum mulai.
 
 ---
 
 ## Ringkasan
 
-Pipeline **ASR + Speaker Diarization sudah berjalan** dan itu adalah pencapaian terbesar sejauh ini. Namun **modul evaluasi LLM — inti kontribusi ilmiah penelitian — belum ada sama sekali**, dan seluruh persistensi data masih palsu (dictionary di memori + tabel HTML hardcoded).
+Seluruh alur produk kini tersambung dari ujung ke ujung: unggah audio → validasi → pra-pemrosesan → diarisasi → transkripsi → pra-pemrosesan teks → evaluasi LLM → simpan ke basis data → tampil di halaman Histori dan Penilaian. Tidak ada lagi data palsu di antarmuka.
 
-Kondisi produk saat ini setara dengan **"sistem transkripsi + diarisasi"**, bukan **"sistem evaluasi"**. Proposal sendiri menegaskan (Ardian & Suryadi, 2024) bahwa sistem yang berhenti di transkripsi tanpa metode evaluasi yang jelas *tidak memberikan kontribusi ilmiah yang signifikan*. Karena itu, prioritas mutlak berikutnya adalah **Iterasi 3 (Evaluasi LLM)**.
+**Satu-satunya bagian yang belum pernah dieksekusi sungguhan adalah pemanggilan Gemini API** (Iterasi 3) — inti kontribusi ilmiah penelitian. Kode, validasi keluaran, dan penyimpanannya sudah teruji dengan tiruan; yang belum terbukti adalah perilaku model sungguhan dan **konsistensi skor antar pemanggilan**, yang merupakan klaim utama penelitian. Ini hanya menunggu `GEMINI_API_KEY` diisi di `.env`.
 
-Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan dan terverifikasi**. Yang tersisa justru bagian yang menentukan nilai penelitian: evaluasi, penyimpanan, dan pelaporan hasil.
-
-**Estimasi penyelesaian terhadap 8 kebutuhan fungsional proposal: 4 dari 8 (± 50%)** — KF #1 masih kurang fitur perekaman langsung lewat sistem (saat ini hanya upload).
+**Estimasi penyelesaian terhadap 8 kebutuhan fungsional proposal: 6 dari 8** — KF #6 dan #7 tinggal menunggu uji API sungguhan; KF #1 masih kurang fitur perekaman langsung lewat sistem (saat ini hanya upload).
 
 ---
 
@@ -32,7 +30,7 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 | 5 | Pra-pemrosesan teks | ✅ Selesai | `text_preprocessing.py`: spasi berlebih, karakter asing, kata pengisi, pengulangan ASR, kapitalisasi kalimat, normalisasi slang, penyusunan ulang per waktu & per pembicara |
 | 6 | **Evaluasi otomatis berbasis rubrik** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | `evaluator.py`: rubrik Tabel 3.1 sebagai data, prompt terstruktur, Gemini structured output. Butuh `GEMINI_API_KEY` |
 | 7 | **Menghasilkan skor + umpan balik naratif** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | Skor per indikator + skor akhir (rata-rata) + umpan balik; tampil di tab "Penilaian" |
-| 8 | Menyimpan & menampilkan hasil evaluasi | ⚠️ Menyimpan ✅, menampilkan ❌ | `database.py`: 6 tabel SQLite, penyimpanan bertahap audio→speaker→transcript→segment→assessment. Halaman Histori & Penilaian **masih dummy** (menunggu Iterasi 6) |
+| 8 | Menyimpan & menampilkan hasil evaluasi | ✅ Selesai | `database.py`: 6 tabel SQLite, penyimpanan bertahap audio→speaker→transcript→segment→assessment. Halaman Histori, Detail, dan Penilaian membaca data nyata dari basis data (Iterasi 6) |
 
 ## Status Kebutuhan Non-Fungsional
 
@@ -67,12 +65,13 @@ Setelah Iterasi 1, seluruh **tahap pemrosesan audio (KF #1–#4) kini berjalan d
 
 | Halaman | Template/Rute | Status |
 |---|---|---|
-| Login | `templates/login.html` + `POST /login` | ⚠️ Jalan, tapi password plaintext & sesi palsu |
-| Registrasi | `templates/register.html` + `POST /register` | ⚠️ Jalan, validasi password cocok & username unik ada |
+| Login | `templates/login.html` + `POST /login` | ✅ Jalan — password bcrypt, token sesi acak (Iterasi 5) |
+| Registrasi | `templates/register.html` + `POST /register` | ✅ Jalan — validasi password cocok & username unik |
 | Dashboard | `templates/dashboard.html` | ✅ Jalan |
-| Analisis Audio | Gradio di `/gradio/analisis` | ✅ Jalan (tanpa evaluasi) |
-| Histori | `/histori-content` | ❌ HTML + data dummy hardcoded di dalam `main.py` |
-| Penilaian | `/nilai-content` | ❌ HTML + data dummy hardcoded di dalam `main.py` |
+| Analisis Audio | Gradio di `/gradio/analisis` | ✅ Jalan (evaluasi menunggu uji API) |
+| Histori | `templates/histori.html` + `/histori-content` | ✅ Data nyata dari `ambil_histori()` (Iterasi 6) |
+| Detail Proses | `templates/histori_detail.html` + `/histori-content/{id}` | ✅ Penilaian + transkrip + dialog per pembicara (Iterasi 6) |
+| Penilaian | `templates/penilaian.html` + `/nilai-content` | ✅ Data nyata dari `ambil_penilaian()`, 4 indikator + umpan balik (Iterasi 6) |
 
 ---
 
@@ -135,6 +134,12 @@ Verifikasi: kata sandi tersimpan berformat `$2b$12$...`, bukan teks polos; login
 Perbaikan: token sesi kini dibuat acak dengan `secrets.token_urlsafe(32)` dan dipetakan ke `id_user` di sisi server (`session.py`). Logout menghapus token dari server, bukan sekadar menghapus cookie di peramban.
 Verifikasi via `TestClient`: cookie `bu_intan` dan `admin` ditolak (redirect ke login); login sah menghasilkan token acak 43 karakter yang bukan username; token yang sudah logout ditolak.
 
+### ✅ BUG-08 — Seluruh pemanggilan `TemplateResponse` memakai tanda tangan lama yang sudah dibuang starlette (Tinggi) — **DIPERBAIKI**
+**Ditemukan saat Iterasi 6.** Semua rute yang merender template memanggil `TemplateResponse("nama.html", {"request": request, ...})` — gaya lama yang **sudah dihapus di starlette 1.x** (versi terpasang: 1.3.1). Setiap halaman HTML (login, register, dashboard, histori, penilaian) gagal dirender dengan `TypeError: unhashable type: 'dict'` karena starlette menafsirkan kamus konteks sebagai nama template. Bug ini tidak tertangkap pengujian Iterasi 5 karena pengujian saat itu hanya menyentuh jalur redirect (303), bukan jalur render template.
+
+Perbaikan: seluruh 10 pemanggilan diubah ke tanda tangan baru `TemplateResponse(request, "nama.html", {...})`.
+Verifikasi via `TestClient`: `GET /login`, `GET /register`, register dengan password tidak cocok (halaman error), dashboard setelah login, dan shell `/app/histori` semuanya merender 200 dengan isi yang benar.
+
 ### ✅ BUG-04 — `app.py` tidak bisa dijalankan langsung (Rendah) — **DIPERBAIKI**
 Blok `if __name__ == "__main__":` ditambahkan; `python app.py` kini meluncurkan modul analisis Gradio secara mandiri, sesuai klaim di `GEMINI.md`. Untuk aplikasi penuh tetap gunakan `uvicorn main:app --reload`.
 
@@ -167,8 +172,29 @@ Perlu dirapikan sebelum sidang:
 3. ~~Iterasi 2 (Validasi Audio)~~ — ✅ selesai & terverifikasi.
 4. **Isi `GEMINI_API_KEY` di `.env`, lalu uji Iterasi 3 end-to-end.** Kodenya sudah siap, tetapi belum pernah menyentuh Gemini API sungguhan — lihat "Bukti Verifikasi Iterasi 3" di bawah untuk daftar apa yang sudah dan belum teruji.
 5. ~~Iterasi 4 (Pra-pemrosesan Teks)~~ dan ~~Iterasi 5 (Database)~~ — ✅ selesai & terverifikasi.
-6. Iterasi 6 (Histori & Penilaian nyata) — mengganti tabel dummy di `main.py` dengan query `database.ambil_histori()` dan `database.ambil_penilaian()` yang sudah siap pakai.
-7. Iterasi 7 (Black Box, White Box, UAT) → Iterasi 8 (pengukuran objektivitas vs guru).
+6. ~~Iterasi 6 (Histori & Penilaian nyata)~~ — ✅ selesai & terverifikasi.
+7. Iterasi 7 (Black Box, White Box, UAT) → Iterasi 8 (pengukuran objektivitas vs guru). **Catatan**: data UAT dan skor manual guru hanya dapat dikumpulkan dari responden sungguhan — instrumen dan skrip perhitungannya disiapkan sistem, datanya wajib diisi manusia.
+
+### Bukti Verifikasi Iterasi 6
+
+Seluruh pengujian berjalan tanpa memerlukan API maupun model (modul Gradio/Whisper di-stub; rute FastAPI, template Jinja, dan basis data diuji sungguhan lewat `TestClient`), sehingga Iterasi 6 **terverifikasi penuh** — 16 uji, semuanya lolos.
+
+**Kriteria "selesai" PLANNING.md** — evaluasi yang baru dibuat langsung muncul di Histori tanpa mengubah kode: ✅ **terbukti**. Satu hasil evaluasi disimpan lewat `db.simpan_hasil()` (jalur yang sama persis dengan `app.py`), lalu `GET /histori-content` langsung menampilkan berkas, skor akhir, dan durasinya.
+
+| Aspek | Hasil |
+|---|---|
+| Histori/Penilaian kosong → pesan panduan, bukan tabel kosong | ✅ |
+| Evaluasi baru langsung muncul di Histori | ✅ Nama berkas + skor 3.50/4 + durasi "1 mnt 35 dtk" |
+| Data dummy lama hilang seluruhnya | ✅ Tidak ada jejak `rapat_q3_2023.mp3` dkk. |
+| Penilaian menampilkan 4 skor indikator + skor akhir + topik | ✅ |
+| Halaman detail: penilaian + teks dinilai + dialog per pembicara | ✅ |
+| Proses tanpa penilaian → label "tidak dinilai", detail tetap terbuka | ✅ |
+| Isolasi antar guru (daftar & tebak `id_audio` → 404) | ✅ |
+| Tanpa login → 403 di ketiga rute konten | ✅ |
+| Umpan balik / nama berkas ber-tag HTML di-escape (anti-XSS) | ✅ `<script>` tampil sebagai teks, tidak dieksekusi |
+| Halaman lama (login, register, dashboard, shell iframe) tetap render | ✅ Pasca perbaikan BUG-08 |
+
+Keputusan teknis: konten halaman dipindah dari string HTML di dalam `main.py` ke template Jinja2 (`histori.html`, `histori_detail.html`, `penilaian.html`, CSS bersama `_konten.css`). Alasannya bukan kerapian semata — nama berkas dan umpan balik LLM kini masuk ke halaman, dan penyusunan HTML lewat string membuka celah XSS; Jinja2 meng-escape otomatis (dan ini diuji).
 
 ### Bukti Verifikasi Iterasi 5
 

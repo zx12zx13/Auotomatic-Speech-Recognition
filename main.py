@@ -15,6 +15,27 @@ from session import sesi_aktif
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
+
+def _filter_ganti_t(nilai):
+    """Format waktu ISO ('2026-07-17T10:03:05') menjadi '2026-07-17 10:03'."""
+    if not nilai:
+        return "-"
+    return str(nilai).replace("T", " ")[:16]
+
+
+def _filter_durasi(detik):
+    """Format durasi detik menjadi teks, mis. 125.3 -> '2 mnt 5 dtk'."""
+    if detik is None:
+        return "-"
+    detik = int(detik)
+    if detik < 60:
+        return f"{detik} dtk"
+    return f"{detik // 60} mnt {detik % 60} dtk"
+
+
+templates.env.filters["ganti_t"] = _filter_ganti_t
+templates.env.filters["durasi"] = _filter_durasi
+
 # Menyiapkan tabel basis data saat aplikasi dimuat.
 db.init_db()
 
@@ -48,7 +69,7 @@ app = gr.mount_gradio_app(app, unified_app_gradio, path="/gradio/analisis")
 async def root(request: Request, user: User = Depends(get_current_user)):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "active_page": "dashboard"})
+    return templates.TemplateResponse(request, "dashboard.html", {"user": user, "active_page": "dashboard"})
 
 @app.get("/app/{app_name}", response_class=HTMLResponse)
 async def show_app(request: Request, app_name: str, user: User = Depends(get_current_user)):
@@ -65,111 +86,59 @@ async def show_app(request: Request, app_name: str, user: User = Depends(get_cur
     if not app_info:
         return HTMLResponse("Aplikasi tidak ditemukan.", status_code=404)
 
-    return templates.TemplateResponse("app_view.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "app_view.html", {
         "user": user,
         "title": app_info["title"],
         "iframe_src": app_info["iframe_src"],
-        "active_page": app_name
+        "active_page": app_name,
     })
 
 # --- Rute Konten (untuk di-embed di iframe) ---
 @app.get("/histori-content", response_class=HTMLResponse)
 async def history_page_content(request: Request, user: User = Depends(get_current_user)):
-    if not user: return HTMLResponse("Akses ditolak.", status_code=403)
-    
-    # The HTML content from the previous step, but now it's served as a standalone page for the iframe
-    content = """
-    <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Histori</title>
-    <style>
-        body { font-family: 'Roboto', sans-serif; background-color: #f4f7fc; margin: 0; padding: 2rem; }
-        .container { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.07); }
-        h1 { color: #102a43; margin-top: 0; margin-bottom: 1.5rem; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-        th, td { border: 1px solid #e2e8f0; padding: 0.8rem 1rem; text-align: left; }
-        th { background-color: #f8fafc; font-weight: 600; }
-        tbody tr:nth-child(even) { background-color: #f8fafc; }
-        a { color: #2a6fdb; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style></head>
-    <body>
-        <div class="container">
-            <h1>Riwayat Pemrosesan Audio</h1>
-            <table>
-                <thead>
-                    <tr><th>Tanggal</th><th>Nama File</th><th>Jenis Proses</th><th>Durasi</th><th>Status</th><th>Aksi</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>2023-10-26 10:00</td><td>rapat_q3_2023.mp3</td><td>Transkripsi</td><td>45 menit</td><td>Selesai</td><td><a href="#">Lihat</a></td></tr>
-                    <tr><td>2023-10-25 14:30</td><td>interview_andi.wav</td><td>Diarisasi</td><td>12 menit</td><td>Selesai</td><td><a href="#">Lihat</a></td></tr>
-                    <tr><td>2023-10-24 09:15</td><td>presentasi_produk.m4a</td><td>Transkripsi</td><td>30 menit</td><td>Selesai</td><td><a href="#">Lihat</a></td></tr>
-                    <tr><td>2023-10-23 11:00</td><td>diskusi_tim.ogg</td><td>Diarisasi</td><td>20 menit</td><td>Selesai</td><td><a href="#">Lihat</a></td></tr>
-                </tbody>
-            </table>
-        </div>
-    </body></html>
-    """
-    return HTMLResponse(content=content)
+    if not user:
+        return HTMLResponse("Akses ditolak.", status_code=403)
+    histori = db.ambil_histori(user.id_user)
+    return templates.TemplateResponse(request, "histori.html", {"histori": histori})
+
+
+@app.get("/histori-content/{id_audio}", response_class=HTMLResponse)
+async def history_detail_content(request: Request, id_audio: int, user: User = Depends(get_current_user)):
+    if not user:
+        return HTMLResponse("Akses ditolak.", status_code=403)
+    # ambil_detail_audio menyaring berdasarkan id_user, sehingga guru tidak
+    # dapat membuka data guru lain dengan menebak id_audio.
+    detail = db.ambil_detail_audio(id_audio, user.id_user)
+    if detail is None:
+        return HTMLResponse("Data tidak ditemukan.", status_code=404)
+    return templates.TemplateResponse(request, "histori_detail.html", {"detail": detail})
+
 
 @app.get("/nilai-content", response_class=HTMLResponse)
 async def nilai_page_content(request: Request, user: User = Depends(get_current_user)):
-    if not user: return HTMLResponse("Akses ditolak.", status_code=403)
-
-    content = """
-    <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Penilaian</title>
-    <style>
-        body { font-family: 'Roboto', sans-serif; background-color: #f4f7fc; margin: 0; padding: 2rem; }
-        .container { background-color: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.07); }
-        h1 { color: #102a43; margin-top: 0; margin-bottom: 1.5rem; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-        th, td { border: 1px solid #e2e8f0; padding: 0.8rem 1rem; text-align: left; }
-        th { background-color: #f8fafc; font-weight: 600; }
-        tbody tr:nth-child(even) { background-color: #f8fafc; }
-        a { color: #2a6fdb; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style></head>
-    <body>
-        <div class="container">
-            <h1>Riwayat Penilaian Transkrip</h1>
-            <table>
-                <thead>
-                    <tr><th>Tanggal</th><th>File Audio</th><th>Skor Akurasi</th><th>Umpan Balik</th><th>Aksi</th></tr>
-                </thead>
-                <tbody>
-                    <tr><td>2023-10-26 11:30</td><td>rapat_q3_2023.mp3</td><td>92%</td><td>"Transkrip sangat akurat..."</td><td><a href="#">Detail</a></td></tr>
-                    <tr><td>2023-10-25 15:00</td><td>interview_andi.wav</td><td>88%</td><td>"Perlu perbaikan pada..."</td><td><a href="#">Detail</a></td></tr>
-                    <tr><td>2023-10-24 10:00</td><td>presentasi_produk.m4a</td><td>95%</td><td>"Hasil luar biasa..."</td><td><a href="#">Detail</a></td></tr>
-                </tbody>
-            </table>
-        </div>
-    </body></html>
-    """
-    return HTMLResponse(content=content)
+    if not user:
+        return HTMLResponse("Akses ditolak.", status_code=403)
+    penilaian = db.ambil_penilaian(user.id_user)
+    return templates.TemplateResponse(request, "penilaian.html", {"penilaian": penilaian})
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = None, success: str = None):
-    return templates.TemplateResponse("login.html", {"request": request, "error": error, "success": success})
+    return templates.TemplateResponse(request, "login.html", {"error": error, "success": success})
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request, error: str = None):
-    return templates.TemplateResponse("register.html", {"request": request, "error": error})
+    return templates.TemplateResponse(request, "register.html", {"error": error})
 
 @app.post("/register")
 async def handle_registration(request: Request, username: str = Form(...), password: str = Form(...), confirm_password: str = Form(...)):
     if password != confirm_password:
-        return templates.TemplateResponse("register.html", {
-            "request": request,
-            "error": "Password tidak cocok."
-        })
+        return templates.TemplateResponse(request, "register.html", {"error": "Password tidak cocok."})
 
     try:
         db.buat_user(username, password)
     except ValueError as e:
-        return templates.TemplateResponse("register.html", {
-            "request": request,
-            "error": str(e)
-        })
+        return templates.TemplateResponse(request, "register.html", {"error": str(e)})
 
     # Redirect ke halaman login dengan pesan sukses
     return RedirectResponse(url="/login?success=Registrasi+berhasil!+Silakan+login.", status_code=303)
@@ -178,10 +147,7 @@ async def handle_registration(request: Request, username: str = Form(...), passw
 async def handle_login(request: Request, username: str = Form(...), password: str = Form(...)):
     id_user = db.verifikasi_user(username, password)
     if id_user is None:
-        return templates.TemplateResponse("login.html", {
-            "request": request,
-            "error": "Username atau password salah."
-        })
+        return templates.TemplateResponse(request, "login.html", {"error": "Username atau password salah."})
 
     # Token sesi dibuat acak. Nilai cookie tidak boleh dapat ditebak: bila
     # cookie berisi username, siapa pun dapat memalsukannya dan masuk tanpa

@@ -1,0 +1,104 @@
+/* Gaya bersama untuk halaman konten yang ditampilkan di dalam iframe.
+   Disertakan lewat tag include Jinja agar Histori dan Penilaian tidak
+   menyalin CSS yang sama dua kali. */
+:root {
+    --primary-color: #2a6fdb;
+    --background-color: #f4f7fc;
+    --widget-bg: #ffffff;
+    --heading-color: #102a43;
+    --subtle-text: #627d98;
+    --border-color: #e2e8f0;
+}
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--background-color);
+    margin: 0;
+    padding: 2rem;
+    color: #333;
+}
+.container {
+    background-color: var(--widget-bg);
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.07);
+}
+h1 {
+    color: var(--heading-color);
+    margin-top: 0;
+    margin-bottom: 0.4rem;
+    font-size: 1.5rem;
+}
+.subjudul {
+    color: var(--subtle-text);
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+th, td {
+    border: 1px solid var(--border-color);
+    padding: 0.8rem 1rem;
+    text-align: left;
+    vertical-align: top;
+}
+th {
+    background-color: #f8fafc;
+    font-weight: 600;
+    color: var(--heading-color);
+}
+tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}
+.kosong {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--subtle-text);
+}
+.kosong strong {
+    display: block;
+    color: var(--heading-color);
+    font-size: 1.05rem;
+    margin-bottom: 0.5rem;
+}
+.badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+.badge-selesai { background: #e3f9e5; color: #207227; }
+.badge-diproses { background: #fff4e0; color: #8a5a00; }
+.skor {
+    font-weight: 700;
+    color: var(--heading-color);
+}
+.skor-kosong {
+    color: var(--subtle-text);
+    font-style: italic;
+    font-weight: 400;
+}
+.umpan-balik {
+    max-width: 28rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.indikator {
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+.indikator span {
+    display: inline-block;
+    margin-right: 0.6rem;
+}

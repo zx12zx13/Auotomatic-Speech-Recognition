@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penilaian</title>
+    <style>{% include "_konten.css" %}</style>
+</head>
+<body>
+    <div class="container">
+        <h1>Riwayat Penilaian</h1>
+        <p class="subjudul">
+            Skor 1&ndash;4 per indikator rubrik: 1 = Kurang, 2 = Cukup, 3 = Baik, 4 = Sangat Baik.
+        </p>
+
+        {% if penilaian %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Waktu</th>
+                    <th>Berkas Audio</th>
+                    <th>Topik / Pertanyaan</th>
+                    <th>Skor per Indikator</th>
+                    <th>Skor Akhir</th>
+                    <th>Umpan Balik</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in penilaian %}
+                <tr>
+                    <td style="white-space:nowrap">{{ p["created_at"] | ganti_t }}</td>
+                    <td>
+                        {{ p["filename"] }}
+                        {% if p["speaker_label"] %}
+                        <br><span class="skor-kosong">{{ p["speaker_label"] }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ p["topik"] or "-" }}</td>
+                    <td class="indikator">
+                        <span>Relevansi: <strong>{{ p["score_relevansi"] }}</strong></span><br>
+                        <span>Konsep: <strong>{{ p["score_konsep"] }}</strong></span><br>
+                        <span>Kelengkapan: <strong>{{ p["score_kelengkapan"] }}</strong></span><br>
+                        <span>Koherensi: <strong>{{ p["score_koherensi"] }}</strong></span>
+                    </td>
+                    <td><span class="skor">{{ "%.2f" | format(p["score"]) }} / 4</span></td>
+                    <td class="umpan-balik">{{ p["feedback"] or "-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="kosong">
+            <strong>Belum ada penilaian.</strong>
+            Proses sebuah audio di menu <em>Analisis Audio</em> dengan kolom
+            Topik/Pertanyaan terisi; skornya akan muncul di sini.
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

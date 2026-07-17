@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detail Proses</title>
+    <style>
+        {% include "_konten.css" %}
+        .blok { margin-bottom: 2rem; }
+        .transkrip {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+        .kembali { display: inline-block; margin-bottom: 1rem; }
+        .meta { color: var(--subtle-text); font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a class="kembali" href="/histori-content">&larr; Kembali ke Histori</a>
+        <h1>{{ detail.audio["filename"] }}</h1>
+        <p class="meta">
+            Diunggah {{ detail.audio["uploaded_at"] | ganti_t }}
+            &middot; Durasi {{ detail.audio["duration"] | durasi }}
+        </p>
+
+        {% if detail.penilaian %}
+        <div class="blok">
+            <h2>Hasil Penilaian</h2>
+            <table>
+                <tbody>
+                    <tr><th>Topik / Pertanyaan</th><td>{{ detail.penilaian["topik"] or "-" }}</td></tr>
+                    <tr><th>Skor Akhir</th><td><span class="skor">{{ "%.2f" | format(detail.penilaian["score"]) }} / 4</span></td></tr>
+                    <tr>
+                        <th>Skor per Indikator</th>
+                        <td class="indikator">
+                            <span>Relevansi: <strong>{{ detail.penilaian["score_relevansi"] }}</strong></span>
+                            <span>Konsep: <strong>{{ detail.penilaian["score_konsep"] }}</strong></span>
+                            <span>Kelengkapan: <strong>{{ detail.penilaian["score_kelengkapan"] }}</strong></span>
+                            <span>Koherensi: <strong>{{ detail.penilaian["score_koherensi"] }}</strong></span>
+                        </td>
+                    </tr>
+                    <tr><th>Umpan Balik</th><td class="umpan-balik">{{ detail.penilaian["feedback"] or "-" }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="blok">
+            <h2>Hasil Penilaian</h2>
+            <p class="skor-kosong">Proses ini tidak disertai penilaian (topik tidak diisi atau evaluasi gagal).</p>
+        </div>
+        {% endif %}
+
+        {% if detail.transkrip and detail.transkrip["corrected_text"] %}
+        <div class="blok">
+            <h2>Teks yang Dinilai (hasil pra-pemrosesan)</h2>
+            <div class="transkrip">{{ detail.transkrip["corrected_text"] }}</div>
+        </div>
+        {% endif %}
+
+        {% if detail.segmen %}
+        <div class="blok">
+            <h2>Dialog per Pembicara</h2>
+            <table>
+                <thead>
+                    <tr><th>Waktu</th><th>Pembicara</th><th>Ucapan</th></tr>
+                </thead>
+                <tbody>
+                    {% for s in detail.segmen %}
+                    <tr>
+                        <td style="white-space:nowrap">{{ "%.1f" | format(s["start_time"] or 0) }}s &ndash; {{ "%.1f" | format(s["end_time"] or 0) }}s</td>
+                        <td style="white-space:nowrap">{{ s["speaker_label"] }}</td>
+                        <td>{{ s["text"] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% elif detail.transkrip and detail.transkrip["full_text"] %}
+        <div class="blok">
+            <h2>Transkrip Lengkap</h2>
+            <div class="transkrip">{{ detail.transkrip["full_text"] }}</div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

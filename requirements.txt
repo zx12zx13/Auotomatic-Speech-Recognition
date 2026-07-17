@@ -1,3 +1,5 @@
+# Versi dipaku sesuai lingkungan yang teruji, demi reprodusibilitas penelitian.
+
 # Core numeric
 numpy==1.26.4
 numba>=0.59
@@ -13,11 +15,19 @@ openai-whisper
 pyannote.audio==3.1.1
 speechbrain>=0.5.14
 torch-audiomentations==0.11.0
-# Hugging Face (kompatibel dengan pyannote 3.1.1)
-huggingface_hub==0.20.3
+# CATATAN: di-upgrade dari 0.20.3 bersama gradio 6. Pembangunan UI sudah
+# teruji; pemuatan pyannote dengan token sungguhan perlu diuji ulang
+# begitu .env terisi.
+huggingface_hub==1.23.0
 
-# UI
-gradio==3.50.2
+# UI (di-upgrade dari 3.50.2; UI & mounting teruji pada 6.20.0)
+gradio==6.20.0
+
+# Web shell (FastAPI)
+fastapi==0.139.0
+uvicorn==0.51.0
+jinja2==3.1.6
+python-multipart==0.0.32
 
 # Audio processing
 pydub
@@ -25,11 +35,10 @@ noisereduce
 soundfile
 
 # Evaluator LLM
-google-genai
+google-genai==2.12.0
 
 # Basis data & keamanan
-bcrypt
+bcrypt==5.0.0
 
 # Konfigurasi
-python-dotenv
-
+python-dotenv==1.2.2

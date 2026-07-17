@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histori</title>
+    <style>{% include "_konten.css" %}</style>
+</head>
+<body>
+    <div class="container">
+        <h1>Riwayat Pemrosesan Audio</h1>
+        <p class="subjudul">Seluruh audio yang pernah Anda proses, terbaru di atas.</p>
+
+        {% if histori %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Waktu Unggah</th>
+                    <th>Nama Berkas</th>
+                    <th>Durasi</th>
+                    <th>Status</th>
+                    <th>Skor Akhir</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in histori %}
+                <tr>
+                    <td>{{ h["uploaded_at"] | ganti_t }}</td>
+                    <td>{{ h["filename"] }}</td>
+                    <td>{{ h["duration"] | durasi }}</td>
+                    <td>
+                        {% if h["status"] == "selesai" %}
+                        <span class="badge badge-selesai">Selesai</span>
+                        {% else %}
+                        <span class="badge badge-diproses">{{ h["status"] | capitalize }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if h["score"] is not none %}
+                        <span class="skor">{{ "%.2f" | format(h["score"]) }} / 4</span>
+                        {% else %}
+                        <span class="skor-kosong">tidak dinilai</span>
+                        {% endif %}
+                    </td>
+                    <td><a href="/histori-content/{{ h['id_audio'] }}">Lihat detail</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="kosong">
+            <strong>Belum ada riwayat.</strong>
+            Proses sebuah audio di menu <em>Analisis Audio</em>; hasilnya akan
+            otomatis muncul di sini.
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
