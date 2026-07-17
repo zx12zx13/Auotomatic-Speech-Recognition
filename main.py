@@ -131,7 +131,12 @@ async def register_page(request: Request, error: str = None):
     return templates.TemplateResponse(request, "register.html", {"error": error})
 
 @app.post("/register")
-async def handle_registration(request: Request, username: str = Form(...), password: str = Form(...), confirm_password: str = Form(...)):
+async def handle_registration(request: Request, username: str = Form(""), password: str = Form(""), confirm_password: str = Form("")):
+    # Nilai bawaan "" membuat form kosong sampai ke sini dan mendapat pesan
+    # yang ramah, bukan galat validasi 422 berbentuk JSON mentah.
+    if not username.strip() or not password:
+        return templates.TemplateResponse(request, "register.html", {"error": "Username dan password wajib diisi."})
+
     if password != confirm_password:
         return templates.TemplateResponse(request, "register.html", {"error": "Password tidak cocok."})
 
@@ -144,7 +149,10 @@ async def handle_registration(request: Request, username: str = Form(...), passw
     return RedirectResponse(url="/login?success=Registrasi+berhasil!+Silakan+login.", status_code=303)
 
 @app.post("/login")
-async def handle_login(request: Request, username: str = Form(...), password: str = Form(...)):
+async def handle_login(request: Request, username: str = Form(""), password: str = Form("")):
+    if not username.strip() or not password:
+        return templates.TemplateResponse(request, "login.html", {"error": "Username dan password wajib diisi."})
+
     id_user = db.verifikasi_user(username, password)
     if id_user is None:
         return templates.TemplateResponse(request, "login.html", {"error": "Username atau password salah."})

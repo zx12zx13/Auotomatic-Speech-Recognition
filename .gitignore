@@ -14,3 +14,8 @@ __pycache__/
 # Basis data - memuat data siswa dan hasil penilaian, tidak boleh di-commit
 *.db
 *.db-journal
+
+# Jawaban UAT & skor manual guru - data responden penelitian, tidak boleh
+# di-commit ke repositori publik. Templatnya dibuat lewat skrip.
+uat_jawaban.csv
+objektivitas_data.csv

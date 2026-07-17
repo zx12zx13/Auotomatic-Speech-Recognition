@@ -161,11 +161,21 @@ def parse_hasil(data):
         if medan_skor not in data:
             raise EvaluationError(f"Keluaran model tidak memuat '{medan_skor}'.")
 
+        mentah = data[medan_skor]
+        # int() memotong pecahan (int(2.5) -> 2) dan menerima bool
+        # (int(True) -> 1), sehingga keduanya harus ditolak eksplisit —
+        # bukan diam-diam diubah menjadi skor yang tampak sah.
+        if isinstance(mentah, bool) or (
+            isinstance(mentah, float) and not mentah.is_integer()
+        ):
+            raise EvaluationError(
+                f"Skor '{kunci}' bukan bilangan bulat: {mentah!r}."
+            )
         try:
-            skor = int(data[medan_skor])
+            skor = int(mentah)
         except (TypeError, ValueError):
             raise EvaluationError(
-                f"Skor '{kunci}' bukan bilangan bulat: {data[medan_skor]!r}."
+                f"Skor '{kunci}' bukan bilangan bulat: {mentah!r}."
             )
 
         if not SKALA_MIN <= skor <= SKALA_MAKS:

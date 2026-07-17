@@ -2,10 +2,10 @@
 
 Status realisasi produk terhadap proposal. Rencana lengkap ada di [PLANNING.md](PLANNING.md).
 
-**Tanggal peninjauan**: 17 Juli 2026 (diperbarui setelah Iterasi 6 selesai)
-**Basis peninjauan**: `app.py`, `main.py`, `evaluator.py`, `text_preprocessing.py`, `database.py`, `session.py`, `templates/`, riwayat git.
+**Tanggal peninjauan**: 17 Juli 2026 (diperbarui setelah Iterasi 7 — bagian otomatis — selesai)
+**Basis peninjauan**: `app.py`, `main.py`, `evaluator.py`, `text_preprocessing.py`, `database.py`, `session.py`, `templates/`, `tests/`, riwayat git.
 
-**Status iterasi**: Iterasi 1 (MVP Pipeline), 2 (Validasi Audio), 4 (Pra-pemrosesan Teks), 5 (Database), dan 6 (Histori & Penilaian nyata) — ✅ **selesai & terverifikasi**. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 7–8 belum mulai.
+**Status iterasi**: Iterasi 1 (MVP Pipeline), 2 (Validasi Audio), 4 (Pra-pemrosesan Teks), 5 (Database), dan 6 (Histori & Penilaian nyata) — ✅ **selesai & terverifikasi**. Iterasi 7 (Pengujian) — ⚠️ **bagian otomatis selesai** (49 uji lolos, lihat [PENGUJIAN.md](PENGUJIAN.md)); skenario yang butuh model/API dan UAT responden guru masih menunggu. Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi). Iterasi 8 belum mulai.
 
 ---
 
@@ -98,12 +98,12 @@ Klaim proposal bahwa "sistem menyimpan setiap hasil proses ke dalam database sec
 
 | Pengujian | Status |
 |---|---|
-| Black Box | ❌ Belum dilaksanakan |
-| White Box | ❌ Belum dilaksanakan |
-| UAT (10 pertanyaan, responden guru) | ❌ Belum dilaksanakan |
-| Pengukuran objektivitas vs penilaian manual guru (RM #2) | ❌ Belum dilaksanakan |
+| Black Box | ⚠️ 17/23 skenario Lampiran 5 lolos otomatis (`tests/test_blackbox.py`); 6 skenario butuh model/API → uji manual |
+| White Box | ⚠️ 16/23 jalur Lampiran 5 lolos otomatis (`tests/test_whitebox.py`); 6 jalur implisit di model; WB-007 tidak berlaku |
+| UAT (10 pertanyaan, responden guru) | ⚠️ Instrumen + skrip hitung (`uat_hitung.py`) siap; **pengambilan data responden belum** |
+| Pengukuran objektivitas vs penilaian manual guru (RM #2) | ❌ Belum dilaksanakan (Iterasi 8) |
 
-Tidak ada berkas test di repositori. Karena model pengembangan Agile mengharuskan pengujian bertahap per modul, mulai menulis skenario Black Box begitu Iterasi 2 selesai — jangan tunggu semua fitur rampung.
+Rincian lengkap per TC-ID, penyesuaian terhadap Lampiran 5, dan cara menjalankan ada di [PENGUJIAN.md](PENGUJIAN.md). Jalankan dengan `python -m unittest discover -s tests`.
 
 ---
 
@@ -133,6 +133,14 @@ Verifikasi: kata sandi tersimpan berformat `$2b$12$...`, bukan teks polos; login
 
 Perbaikan: token sesi kini dibuat acak dengan `secrets.token_urlsafe(32)` dan dipetakan ke `id_user` di sisi server (`session.py`). Logout menghapus token dari server, bukan sekadar menghapus cookie di peramban.
 Verifikasi via `TestClient`: cookie `bu_intan` dan `admin` ditolak (redirect ke login); login sah menghasilkan token acak 43 karakter yang bukan username; token yang sudah logout ditolak.
+
+### ✅ BUG-09 — Skor pecahan dan boolean dari LLM diam-diam dibulatkan menjadi skor sah (Sedang, integritas data) — **DIPERBAIKI**
+**Ditemukan saat Iterasi 7.** `parse_hasil()` memakai `int(data[medan_skor])` untuk memaksa skor menjadi bilangan bulat. Masalahnya `int()` **memotong** pecahan dan menerima boolean: bila model mengembalikan `2.5`, sistem diam-diam menyimpannya sebagai **2**; bila mengembalikan `true`, tersimpan sebagai **1**. Keduanya lolos validasi skala 1–4 dan tampak sebagai penilaian sah.
+
+Ini bertentangan langsung dengan prinsip yang sudah ditetapkan di modul ini sendiri — docstring `parse_hasil()` menyatakan skor tidak sah "ditolak, bukan diperbaiki diam-diam". Dampaknya nyata bagi penelitian: skor yang dilaporkan bukan skor yang diberikan model, sehingga analisis objektivitas (RM #2) berpijak pada angka yang salah tanpa ada jejak.
+
+Perbaikan: pecahan non-bulat dan boolean kini ditolak eksplisit dengan `EvaluationError`. Nilai float yang setara bulat (`4.0`) tetap diterima, karena JSON wajar mengirim bentuk itu.
+Verifikasi: `test_wb021b` menolak `0, 5, 7, -1, 2.5, "2.5", True, None, "tiga"`; `test_wb021b2` memastikan `4.0` tetap diterima sebagai 4.
 
 ### ✅ BUG-08 — Seluruh pemanggilan `TemplateResponse` memakai tanda tangan lama yang sudah dibuang starlette (Tinggi) — **DIPERBAIKI**
 **Ditemukan saat Iterasi 6.** Semua rute yang merender template memanggil `TemplateResponse("nama.html", {"request": request, ...})` — gaya lama yang **sudah dihapus di starlette 1.x** (versi terpasang: 1.3.1). Setiap halaman HTML (login, register, dashboard, histori, penilaian) gagal dirender dengan `TypeError: unhashable type: 'dict'` karena starlette menafsirkan kamus konteks sebagai nama template. Bug ini tidak tertangkap pengujian Iterasi 5 karena pengujian saat itu hanya menyentuh jalur redirect (303), bukan jalur render template.
@@ -173,7 +181,28 @@ Perlu dirapikan sebelum sidang:
 4. **Isi `GEMINI_API_KEY` di `.env`, lalu uji Iterasi 3 end-to-end.** Kodenya sudah siap, tetapi belum pernah menyentuh Gemini API sungguhan — lihat "Bukti Verifikasi Iterasi 3" di bawah untuk daftar apa yang sudah dan belum teruji.
 5. ~~Iterasi 4 (Pra-pemrosesan Teks)~~ dan ~~Iterasi 5 (Database)~~ — ✅ selesai & terverifikasi.
 6. ~~Iterasi 6 (Histori & Penilaian nyata)~~ — ✅ selesai & terverifikasi.
-7. Iterasi 7 (Black Box, White Box, UAT) → Iterasi 8 (pengukuran objektivitas vs guru). **Catatan**: data UAT dan skor manual guru hanya dapat dikumpulkan dari responden sungguhan — instrumen dan skrip perhitungannya disiapkan sistem, datanya wajib diisi manusia.
+7. ~~Iterasi 7 — bagian otomatis (Black Box + White Box)~~ — ✅ selesai, 49 uji lolos.
+8. **Iterasi 7 — bagian manual**: jalankan skenario bertanda "UJI MANUAL" di [PENGUJIAN.md](PENGUJIAN.md) (butuh `.env` terisi), lalu kumpulkan data UAT dari guru dan hitung dengan `uat_hitung.py`. **Hanya Anda yang bisa melakukan ini** — instrumen dan skrip perhitungannya sudah siap, datanya wajib berasal dari responden sungguhan.
+9. Iterasi 8 (pengukuran objektivitas vs guru).
+
+### Bukti Verifikasi Iterasi 7 — ⚠️ SEBAGIAN (bagian otomatis penuh)
+
+`python -m unittest discover -s tests` → **49 uji, semuanya lolos** (17 Juli 2026). Rincian per TC-ID Lampiran 5 ada di [PENGUJIAN.md](PENGUJIAN.md).
+
+| Cakupan | Hasil |
+|---|---|
+| Black Box (Lampiran 5) | ✅ 17/23 skenario + 2 skenario keamanan tambahan |
+| White Box (Lampiran 5) | ✅ 16/23 jalur; WB-007 tidak berlaku (tidak ada kolom `isActive`) |
+| Temuan bug baru | ✅ BUG-09 ditemukan & diperbaiki lewat pengujian ini |
+| Instrumen UAT + skrip hitung | ✅ Rumus `P = (ΣX/ΣXmaks) × 100` diuji: 2 responden contoh → 65/80 = 81,25%, rincian per aspek & per pertanyaan; jawaban tidak sah (`Z`) ditolak |
+
+**BELUM diuji** — butuh model/API sungguhan atau responden manusia:
+
+- BB-012 s.d. BB-019: audio hening, diarisasi, transkripsi, dan mutu skor LLM.
+- WB-012 s.d. WB-018: jalur VAD, deteksi pergantian pembicara, dan transkripsi (implisit di dalam model, bukan percabangan kode).
+- **Data UAT dari guru sungguhan.** Skrip `uat_hitung.py` hanya menghitung; ia tidak membuat data. Angka 81,25% di atas berasal dari 2 baris contoh untuk menguji rumusnya, **bukan hasil UAT** — jangan pernah masuk ke laporan.
+
+> **Catatan kejujuran akademik**: uji otomatis sengaja tidak mengklaim skenario yang belum benar-benar dijalankan. Kolom "Hasil" pada Lampiran 5 baru boleh diisi setelah skenario manual dijalankan sungguhan.
 
 ### Bukti Verifikasi Iterasi 6
 
