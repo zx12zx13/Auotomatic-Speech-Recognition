@@ -15,13 +15,19 @@ openai-whisper
 pyannote.audio==3.1.1
 speechbrain>=0.5.14
 torch-audiomentations==0.11.0
-# CATATAN: di-upgrade dari 0.20.3 bersama gradio 6. Pembangunan UI sudah
-# teruji; pemuatan pyannote dengan token sungguhan perlu diuji ulang
-# begitu .env terisi.
-huggingface_hub==1.23.0
 
-# UI (di-upgrade dari 3.50.2; UI & mounting teruji pada 6.20.0)
-gradio==6.20.0
+# PENTING - jangan naikkan ke 1.x. pyannote.audio 3.1.1 memanggil
+# hf_hub_download(use_auth_token=...), dan parameter itu DIHAPUS di
+# huggingface_hub 1.0. Dengan hub 1.x, diarization gagal total
+# ("unexpected keyword argument 'use_auth_token'"). Batas ini pula yang
+# mengunci versi gradio di bawah. Teruji: pyannote termuat dengan token
+# sungguhan pada 0.36.2.
+huggingface_hub==0.36.2
+
+# UI. Versi 6.20.0 menarik huggingface_hub>=1.2.0 sehingga merusak pyannote
+# (lihat catatan di atas); 6.17.3 adalah gradio terbaru yang masih menerima
+# hub 0.x. Teruji: UI terbangun & ter-mount ke FastAPI.
+gradio==6.17.3
 
 # Web shell (FastAPI)
 fastapi==0.139.0

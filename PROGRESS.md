@@ -5,9 +5,9 @@ Status realisasi produk terhadap proposal. Rencana lengkap ada di [PLANNING.md](
 **Tanggal peninjauan**: 17 Juli 2026 (diperbarui setelah seluruh 8 iterasi dikerjakan)
 **Basis peninjauan**: `app.py`, `main.py`, `evaluator.py`, `text_preprocessing.py`, `database.py`, `session.py`, `objektivitas.py`, `uat_hitung.py`, `templates/`, `tests/`, riwayat git.
 
-**Status iterasi**: Iterasi 1 (MVP Pipeline), 2 (Validasi Audio), 4 (Pra-pemrosesan Teks), 5 (Database), dan 6 (Histori & Penilaian nyata) — ✅ **selesai & terverifikasi**. Iterasi 7 (Pengujian) dan 8 (Objektivitas) — ⚠️ **perangkatnya selesai & terverifikasi, datanya belum ada**: 67 uji otomatis lolos, tetapi skenario yang butuh model/API, data UAT dari guru, dan skor manual guru **hanya dapat dikumpulkan oleh peneliti** (lihat [PENGUJIAN.md](PENGUJIAN.md) dan [OBJEKTIVITAS.md](OBJEKTIVITAS.md)). Iterasi 3 (Evaluasi LLM) — ⚠️ **kode selesai, belum lolos kriteria "selesai"** karena belum pernah dijalankan dengan Gemini API sungguhan (`GEMINI_API_KEY` belum diisi).
+**Status iterasi**: Iterasi 1–6 — ✅ **selesai & terverifikasi**, termasuk **Iterasi 3 (Evaluasi LLM)** yang kini terbukti dengan Gemini API sungguhan: skor **identik pada 5/5 pemanggilan** (simpangan baku 0,0000) sekaligus **mampu membedakan mutu jawaban** (1,5 → 3,0 → 3,75 → 4,0). Iterasi 7 (Pengujian) dan 8 (Objektivitas) — ⚠️ **perangkatnya selesai & terverifikasi, datanya belum ada**: 67 uji otomatis lolos, tetapi data UAT dari guru dan skor manual guru **hanya dapat dikumpulkan oleh peneliti** (lihat [PENGUJIAN.md](PENGUJIAN.md) dan [OBJEKTIVITAS.md](OBJEKTIVITAS.md)).
 
-> **Satu penghalang menahan tiga iterasi sekaligus.** `GEMINI_API_KEY` yang belum diisi memblokir Iterasi 3 (uji end-to-end), sisa Iterasi 7 (skenario manual BB-018/BB-019), dan Iterasi 8 (butuh skor sistem sungguhan untuk dibandingkan). Ini prioritas tunggal berikutnya.
+> **Seluruh rantai sistem kini terbukti hidup dari ujung ke ujung** — pyannote termuat dengan token sungguhan, Gemini menilai dengan rubrik, hasil tersimpan dan tampil. Yang tersisa bukan lagi soal kode, melainkan **pengambilan data lapangan**: rekaman siswa nyata, kuesioner UAT, dan skor manual guru.
 
 ---
 
@@ -30,8 +30,8 @@ Seluruh alur produk kini tersambung dari ujung ke ujung: unggah audio → valida
 | 3 | Speaker diarization maks. 5 pembicara | ✅ Selesai | Konstanta `MAX_SPEAKERS = 5`, ditegakkan di slider **dan** di `asr_pipeline()` via `min()` |
 | 4 | Transkripsi ASR | ✅ Selesai | Whisper "medium", termasuk timestamp per segmen |
 | 5 | Pra-pemrosesan teks | ✅ Selesai | `text_preprocessing.py`: spasi berlebih, karakter asing, kata pengisi, pengulangan ASR, kapitalisasi kalimat, normalisasi slang, penyusunan ulang per waktu & per pembicara |
-| 6 | **Evaluasi otomatis berbasis rubrik** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | `evaluator.py`: rubrik Tabel 3.1 sebagai data, prompt terstruktur, Gemini structured output. Butuh `GEMINI_API_KEY` |
-| 7 | **Menghasilkan skor + umpan balik naratif** | ⚠️ Kode selesai, **belum diuji dengan API sungguhan** | Skor per indikator + skor akhir (rata-rata) + umpan balik; tampil di tab "Penilaian" |
+| 6 | **Evaluasi otomatis berbasis rubrik** | ✅ Selesai & **terbukti dengan API sungguhan** | `evaluator.py`: rubrik Tabel 3.1 sebagai data, prompt terstruktur, Gemini structured output (`gemini-3.5-flash`, temperature 0). Konsistensi & daya beda terukur |
+| 7 | **Menghasilkan skor + umpan balik naratif** | ✅ Selesai & **terbukti dengan API sungguhan** | Skor per indikator + alasan + skor akhir + umpan balik naratif Bahasa Indonesia; tampil di tab "Penilaian" dan tersimpan |
 | 8 | Menyimpan & menampilkan hasil evaluasi | ✅ Selesai | `database.py`: 6 tabel SQLite, penyimpanan bertahap audio→speaker→transcript→segment→assessment. Halaman Histori, Detail, dan Penilaian membaca data nyata dari basis data (Iterasi 6) |
 
 ## Status Kebutuhan Non-Fungsional
@@ -40,7 +40,7 @@ Seluruh alur produk kini tersambung dari ujung ke ujung: unggah audio → valida
 |---|---|---|---|
 | 1 | Antarmuka sederhana untuk guru | ✅ Sebagian | Dashboard + sidebar + modul Gradio ter-mount sudah berjalan |
 | 2 | Tidak butuh perangkat khusus | ⚠️ | Whisper "medium" berat di CPU. Perlu diukur waktu prosesnya untuk audio 5–10 menit |
-| 3 | Hasil konsisten & terdokumentasi | ⚠️ | Terdokumentasi ✅ (tersimpan di basis data, dapat ditelusuri). Konsistensi skor belum diukur — menunggu uji Iterasi 3 |
+| 3 | Hasil konsisten & terdokumentasi | ✅ Selesai | Terdokumentasi (tersimpan & dapat ditelusuri) **dan konsisten**: 5/5 pemanggilan identik, simpangan baku 0,0000, diukur ulang kapan saja lewat `konsistensi.py` |
 | 4 | Modular | ✅ | `local_nlp_processing`, `pyannote_diarization`, `preprocess_audio`, `asr_pipeline` terpisah rapi |
 | 5 | **Keamanan data audio & hasil evaluasi** | ✅ Selesai | Kredensial di `.env` (BUG-02), password bcrypt (BUG-03), token sesi acak (BUG-07), isolasi data antar guru pada seluruh query |
 
@@ -59,7 +59,7 @@ Seluruh alur produk kini tersambung dari ujung ke ujung: unggah audio → valida
 | [7] Speaker Diarization | ✅ Pyannote 3.1 + filter `MIN_SPEECH_DURATION_S = 0.5` + pemetaan ke "Pembicara 1/2/…" |
 | [8] Transkripsi | ✅ Whisper medium |
 | [9] Pra-pemrosesan Teks | ✅ `text_preprocessing.py` sesuai §3.2.2 poin 9 |
-| [10] **Evaluasi LLM** | ⚠️ `evaluator.py` selesai; menunggu `GEMINI_API_KEY` untuk uji end-to-end |
+| [10] **Evaluasi LLM** | ✅ `evaluator.py` terbukti dengan Gemini sungguhan (`gemini-3.5-flash`), ~4,7 detik per evaluasi |
 
 ---
 
@@ -136,6 +136,22 @@ Verifikasi: kata sandi tersimpan berformat `$2b$12$...`, bukan teks polos; login
 Perbaikan: token sesi kini dibuat acak dengan `secrets.token_urlsafe(32)` dan dipetakan ke `id_user` di sisi server (`session.py`). Logout menghapus token dari server, bukan sekadar menghapus cookie di peramban.
 Verifikasi via `TestClient`: cookie `bu_intan` dan `admin` ditolak (redirect ke login); login sah menghasilkan token acak 43 karakter yang bukan username; token yang sudah logout ditolak.
 
+### ✅ BUG-11 — `huggingface_hub` 1.x membuat diarization gagal total (Kritis) — **DIPERBAIKI**
+**Ditemukan saat uji Iterasi 3.** `pyannote.audio` 3.1.1 memanggil `hf_hub_download(use_auth_token=...)`, sedangkan parameter itu **dihapus di `huggingface_hub` 1.0**. Dengan hub 1.23.0 yang sempat terpasang, pemuatan pipeline diarisasi gagal dengan `TypeError: hf_hub_download() got an unexpected keyword argument 'use_auth_token'` — artinya **speaker diarization, jantung sistem, tidak bisa berjalan sama sekali**.
+
+Akar masalahnya sama dengan BUG-08: `requirements.txt` tidak memaku versi, sehingga `gradio` ter-upgrade diam-diam 3.50.2 → 6.20.0 dan menyeret hub 0.20.3 → 1.23.0. Konfliknya mutlak: gradio 6.20.0 mensyaratkan `huggingface-hub>=1.2.0`, pyannote 3.1.1 butuh `<1.0` — tidak ada irisan.
+
+Perbaikan: turunkan ke `gradio==6.17.3` (versi gradio terbaru yang masih menerima hub 0.x) + `huggingface_hub==0.36.2`, dengan **pyannote 3.1.1 dan torch/torchaudio tidak diubah** agar pipeline ASR yang sudah terbukti tidak terganggu. Seluruh versi kini dipaku beserta alasannya di `requirements.txt`.
+Verifikasi: pyannote `SpeakerDiarization` berhasil dimuat dengan token sungguhan; UI Gradio tetap terbangun & ter-mount; 67 uji tetap lolos.
+
+### ✅ BUG-10 — Baris kosong di `.env` membatalkan nilai default; hasil evaluasi lenyap diam-diam (Kritis, kehilangan data) — **DIPERBAIKI**
+**Ditemukan saat uji Iterasi 3.** Kode memakai `os.getenv("DB_PATH", "evaluasi.db")` dan `os.getenv("GEMINI_MODEL", "gemini-2.5-flash")`, sedangkan `.env.example` yang saya tulis menyuruh **mengosongkan** nilai opsional. Padahal `os.getenv` memakai nilai default hanya bila variabel **tidak ada**, bukan bila ada tetapi kosong. Baris `DB_PATH=` menghasilkan string kosong.
+
+Dampaknya fatal dan senyap: `sqlite3.connect("")` **berhasil** dan membuat basis data sementara yang **terhapus saat koneksi ditutup**. Sistem tetap melaporkan "✅ Hasil tersimpan ke histori (ID: 1)", tetapi seluruh hasil evaluasi hilang — guru dapat memproses rekaman seharian lalu menemukan Histori kosong. `GEMINI_MODEL=` kosong menyebabkan kegagalan yang lebih jinak karena terlihat: `ValueError: model is required`.
+
+Perbaikan: pola diganti `os.getenv("X") or "default"` di `database.py` dan `evaluator.py`; `.env.example` kini mengomentari baris opsional (`# DB_PATH=evaluasi.db`) disertai penjelasan bahayanya, dan `.env` milik pengembang ikut dirapikan.
+Verifikasi: nilai efektif kini `DB_PATH='evaluasi.db'` dan `GEMINI_MODEL='gemini-3.5-flash'`; perilaku `sqlite3.connect("")` yang menghapus diri sendiri didemonstrasikan langsung.
+
 ### ✅ BUG-09 — Skor pecahan dan boolean dari LLM diam-diam dibulatkan menjadi skor sah (Sedang, integritas data) — **DIPERBAIKI**
 **Ditemukan saat Iterasi 7.** `parse_hasil()` memakai `int(data[medan_skor])` untuk memaksa skor menjadi bilangan bulat. Masalahnya `int()` **memotong** pecahan dan menerima boolean: bila model mengembalikan `2.5`, sistem diam-diam menyimpannya sebagai **2**; bila mengembalikan `true`, tersimpan sebagai **1**. Keduanya lolos validasi skala 1–4 dan tampak sebagai penilaian sah.
 
@@ -177,10 +193,10 @@ Perlu dirapikan sebelum sidang:
 
 ## Tindakan Berikutnya (berurutan)
 
-1. **Cabut token Hugging Face yang bocor** (BUG-02) — satu-satunya sisa Iterasi 1, dan hanya bisa Anda lakukan sendiri. Terbitkan token baru lalu isi `.env`.
+1. **Cabut token Hugging Face dan API key Gemini yang beredar** (BUG-02) — hanya bisa dilakukan sendiri oleh peneliti. Keduanya sempat ditempel ke percakapan pengembangan sehingga harus dianggap bocor: cabut di https://huggingface.co/settings/tokens dan https://aistudio.google.com/apikey, terbitkan yang baru, lalu perbarui `.env`. Sistem tetap berjalan tanpa perubahan kode — `.env` tidak pernah ter-commit (diverifikasi lewat `.gitignore`).
 2. ~~Perbaiki BUG-01, BUG-04, BUG-05, BUG-06~~ — ✅ selesai & terverifikasi.
 3. ~~Iterasi 2 (Validasi Audio)~~ — ✅ selesai & terverifikasi.
-4. **Isi `GEMINI_API_KEY` di `.env`, lalu uji Iterasi 3 end-to-end.** Kodenya sudah siap, tetapi belum pernah menyentuh Gemini API sungguhan — lihat "Bukti Verifikasi Iterasi 3" di bawah untuk daftar apa yang sudah dan belum teruji.
+4. ~~Isi `GEMINI_API_KEY` lalu uji Iterasi 3 end-to-end~~ — ✅ selesai & terverifikasi (17 Juli 2026).
 5. ~~Iterasi 4 (Pra-pemrosesan Teks)~~ dan ~~Iterasi 5 (Database)~~ — ✅ selesai & terverifikasi.
 6. ~~Iterasi 6 (Histori & Penilaian nyata)~~ — ✅ selesai & terverifikasi.
 7. ~~Iterasi 7 — bagian otomatis (Black Box + White Box)~~ — ✅ selesai, 49 uji lolos.
@@ -304,9 +320,40 @@ Seluruh pengujian berjalan tanpa memerlukan API maupun model, sehingga Iterasi 5
 
 Dukungan `.mp3` juga diverifikasi: ffmpeg tersedia di sistem dan libsndfile 1.2.2 mampu membaca mp3, sehingga `.mp3` berjalan dari validasi hingga pra-pemrosesan tanpa fallback ke audio mentah.
 
-### Bukti Verifikasi Iterasi 3 — ⚠️ SEBAGIAN
+### Bukti Verifikasi Iterasi 3 — ✅ SELESAI (17 Juli 2026)
 
-**Sudah teruji** (tanpa memanggil Gemini API):
+**Kriteria "selesai" PLANNING.md** — satu transkrip menghasilkan 4 skor + umpan balik yang konsisten pada pemanggilan berulang: ✅ **terbukti dengan Gemini API sungguhan**.
+
+Model: **`gemini-3.5-flash`** (dipaku; lihat catatan model di bawah).
+
+| Aspek | Hasil |
+|---|---|
+| Pemanggilan Gemini API sungguhan | ✅ Berhasil, ~4,7 detik per evaluasi |
+| `response_schema` dipatuhi model | ✅ JSON sesuai skema, validasi `parse_hasil` lolos |
+| Skor + alasan per indikator + umpan balik naratif (Bahasa Indonesia) | ✅ |
+| **Konsistensi skor antar pemanggilan** | ✅ **5/5 pemanggilan IDENTIK**, simpangan baku **0,0000** |
+| **Daya beda terhadap mutu jawaban** | ✅ 4 jawaban bertingkat → **1,5 / 3,0 / 3,75 / 4,0** (naik monoton) |
+| Pemuatan pyannote dengan token sungguhan | ✅ Setelah BUG-11 diperbaiki |
+
+Konsistensi diukur dengan `konsistensi.py` (`ulangi` dan `bedakan`) — alat ini dibuat permanen karena konsistensi adalah klaim inti penelitian (KNF #3) dan wajib dapat diulang oleh penguji.
+
+**Mengapa `bedakan` sama pentingnya dengan `ulangi`**: sistem yang memberi skor sama untuk semua jawaban juga "konsisten" — tetapi tidak berguna. Kedua uji harus dilaporkan bersama; konsistensi tanpa daya beda adalah konsistensi yang menipu.
+
+**Temuan untuk BAB IV**: daya beda terkonsentrasi pada **Kelengkapan Isi** dan **Koherensi**. "Relevansi" dan "Ketepatan Konsep" cepat mencapai skor 4 bahkan untuk jawaban tipis — perilaku yang sebenarnya benar (jawaban singkat bisa tetap *akurat* meski tidak *lengkap*), tetapi layak dibahas sebagai karakteristik rubrik.
+
+**Catatan model — penting untuk reprodusibilitas**: `gemini-2.5-flash` yang semula dipakai **ditolak Google** ("no longer available to new users"), sehingga default diganti `gemini-3.5-flash`. Model **sengaja dipaku, bukan memakai alias** seperti `gemini-flash-latest`: isi alias berubah tanpa pemberitahuan, dan pergantian model di tengah penelitian membuat pengukuran konsistensi maupun objektivitas tidak dapat direproduksi. Bila model diganti kelak, catat tanggal dan versinya di laporan, lalu **ulangi pengukuran konsistensi**.
+
+**Catatan format kunci**: Google memensiunkan API key `AIza` (Standard key) — ditolak sejak Juni 2026, mati total September 2026. Kunci baru berformat `AQ.Ab` (Auth key).
+
+**Yang masih perlu uji manual**:
+
+- Alur penuh dari unggah audio hingga tab "Penilaian" lewat UI (BB-016 s.d. BB-019).
+- Konsistensi pada beberapa jawaban berbeda dan **pada hari yang berbeda** (Google dapat memperbarui model tanpa pemberitahuan).
+- Kewajaran skor terhadap jawaban siswa **nyata**, bukan jawaban buatan.
+
+<details>
+<summary>Riwayat: yang sudah teruji sebelum API key tersedia</summary>
+
 
 | Aspek | Hasil |
 |---|---|
@@ -322,21 +369,17 @@ Dukungan `.mp3` juga diverifikasi: ffmpeg tersedia di sistem dan libsndfile 1.2.
 | Tanpa `GEMINI_API_KEY` gagal dengan pesan jelas | ✅ Ditolak |
 | Jumlah nilai kembalian pipeline = jumlah output Gradio | ✅ Ketiga jalur `return` konsisten 4 nilai |
 
-**BELUM teruji** — memerlukan `GEMINI_API_KEY`:
+Seluruh butir yang dahulu tercatat "BELUM teruji" — pemanggilan API sungguhan, kepatuhan `response_schema`, dan konsistensi antar pemanggilan — **kini sudah diuji dan lolos**; lihat tabel di awal bagian Iterasi 3.
 
-- Pemanggilan Gemini API sungguhan (nama model, autentikasi, kuota).
-- Apakah `response_schema` benar-benar dipatuhi model dan `response.text` berisi JSON sesuai skema.
-- Kualitas dan kewajaran skor yang dihasilkan terhadap jawaban siswa nyata.
-- **Konsistensi skor antar pemanggilan** — `temperature=0.0` sudah diatur untuk tujuan ini, tetapi konsistensi nyata wajib diukur karena menjadi klaim utama penelitian.
-- Alur penuh dari unggah audio hingga tab "Penilaian" lewat UI Gradio.
-
-> **Catatan kejujuran akademik**: selama poin-poin di atas belum diuji, Iterasi 3 **belum boleh dinyatakan selesai** di laporan skripsi. Kriteria "selesai" pada PLANNING.md mensyaratkan satu transkrip menghasilkan 4 skor + umpan balik yang konsisten pada pemanggilan berulang — dan hal itu belum pernah dijalankan.
+</details>
 
 ### Keterbatasan yang Diketahui pada Iterasi 3
 
 1. ~~**Evaluasi memakai transkrip penuh (`full_text`), bukan teks khusus siswa.**~~ — ✅ **teratasi di Iterasi 4.** Yang dinilai kini teks hasil pra-pemrosesan milik pembicara yang dievaluasi saja.
-2. **Belum ada penyimpanan hasil evaluasi.** Skor dan umpan balik hanya tampil di layar dan hilang setelah proses berikutnya (menunggu Iterasi 5).
+2. ~~**Belum ada penyimpanan hasil evaluasi.**~~ — ✅ **teratasi di Iterasi 5.**
 3. **Belum ada mekanisme percobaan ulang (retry).** Kegagalan sementara API langsung dilaporkan sebagai gagal. Ini disengaja agar kegagalan terlihat, bukan tersamar.
+4. **Kuota tier gratis membatasi pengujian.** `gemini-2.5-pro` dan `gemini-2.0-flash-001` sudah menolak dengan `429 RESOURCE_EXHAUSTED` saat uji perbandingan model. Untuk pengambilan data penelitian berskala (mis. 30+ rekaman × pengulangan), sisipkan jeda antar pemanggilan — `konsistensi.py` memakai jeda 4 detik.
+5. **Transkrip siswa dikirim ke server Google.** Pada tier gratis, Google dapat memakai data yang dikirim untuk meningkatkan layanannya. Ini menyangkut data pribadi siswa: perlu dinyatakan dalam izin ke sekolah serta orang tua/wali, dan dicantumkan terus terang sebagai keterbatasan penelitian di laporan.
 
 ### Bukti Verifikasi Iterasi 4
 

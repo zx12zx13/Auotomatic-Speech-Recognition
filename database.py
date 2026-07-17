@@ -16,7 +16,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_PATH = os.getenv("DB_PATH", "evaluasi.db")
+# Memakai `or`, bukan nilai default os.getenv: bila .env memuat baris
+# "DB_PATH=" (ada tetapi kosong), os.getenv mengembalikan string kosong.
+# sqlite3.connect("") DIAM-DIAM membuat basis data sementara yang terhapus
+# saat koneksi ditutup -- seluruh hasil evaluasi akan hilang meski sistem
+# melaporkan penyimpanan berhasil.
+DB_PATH = os.getenv("DB_PATH") or "evaluasi.db"
 
 # Skema mengikuti Tabel 3.2-3.8 proposal. Tabel assessment diberi kolom skor
 # per indikator karena rubrik memiliki 4 indikator, sedangkan proposal hanya

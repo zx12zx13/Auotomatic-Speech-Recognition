@@ -18,7 +18,16 @@ load_dotenv()
 
 # Model dapat diganti lewat .env tanpa mengubah kode, mis. ke gemini-2.5-pro
 # bila diperlukan kualitas penalaran yang lebih tinggi saat pengujian.
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Memakai `or`, bukan nilai default os.getenv: bila .env memuat baris
+# "GEMINI_MODEL=" (ada tetapi kosong), os.getenv mengembalikan string kosong
+# dan default TIDAK dipakai -- pemanggilan API lalu gagal "model is required".
+#
+# Model dipaku pada versi stabil tertentu, BUKAN alias seperti
+# "gemini-flash-latest": isi alias berubah sewaktu-waktu tanpa pemberitahuan,
+# dan pergantian model di tengah penelitian membuat pengukuran konsistensi
+# maupun objektivitas tidak dapat direproduksi. Bila model diganti, catat
+# tanggal dan versinya di laporan.
+GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash"
 
 SKALA_MIN, SKALA_MAKS = 1, 4
 
