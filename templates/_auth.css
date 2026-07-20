@@ -1,0 +1,133 @@
+/* ============================================================
+   Gaya bersama halaman masuk & daftar (login/register).
+   ============================================================ */
+body {
+    background:
+        radial-gradient(1100px 500px at 85% -10%, rgba(30, 92, 70, 0.10), transparent 60%),
+        radial-gradient(900px 480px at -10% 110%, rgba(200, 114, 42, 0.10), transparent 55%),
+        var(--kertas);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 1rem;
+}
+
+.kartu-auth {
+    background: var(--kartu);
+    width: 100%;
+    max-width: 396px;
+    padding: 2.6rem 2.4rem 2.1rem;
+    border: 1px solid var(--garis);
+    border-radius: 18px;
+    box-shadow: var(--bayang-besar);
+    animation: muncul 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes muncul {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Gelombang suara beranimasi - satu-satunya gerak di halaman ini */
+.gelombang { height: 26px; margin-bottom: 1.1rem; }
+.gelombang i {
+    height: calc(26px * var(--t, 0.5));
+    animation: denyut 1.6s ease-in-out infinite alternate;
+    animation-delay: var(--d, 0s);
+}
+@keyframes denyut {
+    from { transform: scaleY(0.55); }
+    to   { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .gelombang i { animation: none; }
+    .kartu-auth { animation: none; }
+}
+
+h1 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.55rem;
+    line-height: 1.25;
+    margin: 0 0 0.4rem;
+    color: var(--tinta);
+}
+.tagline {
+    font-family: var(--f-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--redup);
+    margin: 0 0 1.8rem;
+}
+
+form { display: flex; flex-direction: column; }
+label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--tinta);
+    margin-bottom: 0.45rem;
+    letter-spacing: 0.02em;
+}
+input {
+    font-family: var(--f-body);
+    font-size: 0.98rem;
+    color: var(--tinta);
+    padding: 0.72rem 0.9rem;
+    margin-bottom: 1.15rem;
+    background: #fff;
+    border: 1px solid var(--garis-tegas);
+    border-radius: 10px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus {
+    outline: none;
+    border-color: var(--pinus);
+    box-shadow: 0 0 0 3px rgba(30, 92, 70, 0.18);
+}
+
+button[type="submit"] {
+    font-family: var(--f-body);
+    font-size: 0.98rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff;
+    background: var(--pinus);
+    border: none;
+    border-radius: 10px;
+    padding: 0.8rem;
+    margin-top: 0.3rem;
+    cursor: pointer;
+    transition: background 0.18s, transform 0.12s;
+}
+button[type="submit"]:hover { background: var(--pinus-tua); }
+button[type="submit"]:active { transform: translateY(1px); }
+button[type="submit"]:focus-visible {
+    outline: 3px solid rgba(30, 92, 70, 0.35);
+    outline-offset: 2px;
+}
+
+.error, .success {
+    font-size: 0.88rem;
+    line-height: 1.45;
+    padding: 0.7rem 0.9rem;
+    border-radius: 10px;
+    margin: 1.1rem 0 0;
+}
+.error   { color: var(--merah); background: var(--merah-bg); border: 1px solid #eccfca; }
+.success { color: var(--hijau-ok); background: var(--hijau-ok-bg); border: 1px solid #c8e6cf; }
+
+.tautan-bawah {
+    text-align: center;
+    font-size: 0.88rem;
+    color: var(--redup);
+    margin-top: 1.6rem;
+    padding-top: 1.3rem;
+    border-top: 1px dashed var(--garis-tegas);
+}
+.tautan-bawah a {
+    color: var(--pinus);
+    font-weight: 600;
+    text-decoration: none;
+}
+.tautan-bawah a:hover { text-decoration: underline; }

@@ -1,167 +1,46 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - Portal Edukasi Audio</title>
+    <title>{{ title }} - Sistem Evaluasi Respons Lisan</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
-
-        :root {
-            --primary-color: #2a6fdb;
-            --secondary-color: #1a5bb8;
-            --background-color: #f4f7fc;
-            --sidebar-bg: #ffffff;
-            --widget-bg: #ffffff;
-            --text-color: #333;
-            --heading-color: #102a43;
-            --subtle-text: #627d98;
-            --border-color: #e2e8f0;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--background-color);
-            margin: 0;
-            color: var(--text-color);
-            display: flex;
-        }
-
-        .sidebar {
-            width: 260px;
-            background-color: var(--sidebar-bg);
-            height: 100vh;
-            position: fixed;
-            left: 0;
-            top: 0;
-            border-right: 1px solid var(--border-color);
-            padding: 1.5rem;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            z-index: 100;
-        }
-        
-        .sidebar .logo {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            text-align: center;
-            margin-bottom: 2.5rem;
-        }
-
-        .sidebar-nav a {
-            display: flex;
-            align-items: center;
-            padding: 0.9rem 1rem;
-            color: var(--subtle-text);
-            text-decoration: none;
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            transition: background-color 0.2s, color 0.2s;
-        }
-        .sidebar-nav a:hover, .sidebar-nav a.active {
-            background-color: #eaf1fb;
-            color: var(--primary-color);
-        }
-        .sidebar-nav a .icon {
-            margin-right: 1rem;
-            font-size: 1.2rem;
-            width: 20px;
-            text-align: center;
-        }
-
-        .user-profile {
-            margin-top: auto;
-            border-top: 1px solid var(--border-color);
-            padding-top: 1.5rem;
-            display: flex;
-            align-items: center;
-        }
-        .user-profile .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background-color: var(--primary-color);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            margin-right: 1rem;
-        }
-        .user-profile .username {
-            font-weight: 500;
-        }
-
-        .main-wrapper {
-            margin-left: 260px;
-            width: calc(100% - 260px);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .header {
-            background-color: var(--widget-bg);
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 2rem;
-            border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0;
-        }
-
-        .header h1 {
-            font-size: 1.5rem;
-            color: var(--heading-color);
-            margin: 0;
-        }
-        
-        .logout-form button {
-            background: var(--primary-color);
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            padding: 0.7rem 1.4rem;
-            border-radius: 8px;
-            transition: background-color 0.2s;
-        }
-        .logout-form button:hover {
-            background-color: var(--secondary-color);
-        }
+        {% include "_tokens.css" %}
+        {% include "_shell.css" %}
 
         .content {
             padding: 0;
             flex-grow: 1;
-            height: calc(100vh - 80px); /* Full height minus header */
+            min-height: 0; /* wajib agar iframe tidak memaksa tinggi berlebih */
         }
-
         iframe {
             width: 100%;
             height: 100%;
             border: none;
+            display: block;
         }
-
     </style>
 </head>
 <body>
     <aside class="sidebar">
-        <div class="logo">Sistem Evaluasi</div>
+        <div class="logo">
+            <span class="gelombang" aria-hidden="true">
+                <i style="--t:.4"></i><i style="--t:.8"></i><i style="--t:1"></i><i style="--t:.55"></i><i style="--t:.75"></i>
+            </span>
+            <div class="nama">Evaluasi Lisan<small>ASR &middot; Rubrik LLM</small></div>
+        </div>
         <nav class="sidebar-nav">
-            <a href="/" class="{{ 'active' if active_page == 'dashboard' else '' }}"><span class="icon"></span> Dashboard</a>
-            <a href="/app/analisis" class="{{ 'active' if active_page == 'analisis' else '' }}"><span class="icon"></span> Analisis Audio</a>
-            <a href="/app/histori" class="{{ 'active' if active_page == 'histori' else '' }}"><span class="icon"></span> Histori</a>
-            <a href="/app/nilai" class="{{ 'active' if active_page == 'nilai' else '' }}"><span class="icon"></span> Penilaian</a>
+            <a href="/" class="{{ 'active' if active_page == 'dashboard' else '' }}"><span class="icon">&#9632;</span> Dashboard</a>
+            <a href="/app/analisis" class="{{ 'active' if active_page == 'analisis' else '' }}"><span class="icon">&#9835;</span> Analisis Audio</a>
+            <a href="/app/histori" class="{{ 'active' if active_page == 'histori' else '' }}"><span class="icon">&#9776;</span> Histori</a>
+            <a href="/app/nilai" class="{{ 'active' if active_page == 'nilai' else '' }}"><span class="icon">&#10003;</span> Penilaian</a>
         </nav>
         <div class="user-profile">
             <div class="avatar">{{ user.username[0] | upper }}</div>
-            <div class="username">{{ user.username }}</div>
+            <div>
+                <div class="username">{{ user.username }}</div>
+                <span class="peran">Guru</span>
+            </div>
         </div>
     </aside>
 
@@ -169,12 +48,16 @@
         <header class="header">
             <h1>{{ title }}</h1>
             <form class="logout-form" action="/logout" method="post">
-                <button type="submit">Logout</button>
+                <button type="submit">Keluar</button>
             </form>
         </header>
 
         <main class="content">
-            <iframe src="{{ iframe_src }}"></iframe>
+            <!-- allow="microphone" WAJIB: modul analisis dimuat di dalam iframe,
+                 dan peramban memblokir akses mikrofon pada iframe yang tidak
+                 mendapat pendelegasian izin secara eksplisit. Tanpa atribut ini,
+                 tombol rekam tampil normal tetapi tidak menghasilkan audio apa pun. -->
+            <iframe src="{{ iframe_src }}" allow="microphone"></iframe>
         </main>
     </div>
 </body>

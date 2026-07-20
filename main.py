@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 # Impor fungsi untuk membuat aplikasi Gradio dari app.py
-from app import create_unified_app
+from app import create_unified_app, tema_modul, CSS_SELARAS
 import database as db
 from session import sesi_aktif
 
@@ -60,8 +60,15 @@ def get_current_user(request: Request):
     return User(id_user=row["id_user"], username=row["username"])
 
 # --- Mounting Aplikasi Gradio (di path baru) ---
+# Pada Gradio 6, tema dan CSS kustom diberikan di sini, bukan di gr.Blocks.
 unified_app_gradio = create_unified_app()
-app = gr.mount_gradio_app(app, unified_app_gradio, path="/gradio/analisis")
+app = gr.mount_gradio_app(
+    app,
+    unified_app_gradio,
+    path="/gradio/analisis",
+    theme=tema_modul(),
+    css=CSS_SELARAS,
+)
 
 
 # --- Rute FastAPI ---
@@ -69,7 +76,12 @@ app = gr.mount_gradio_app(app, unified_app_gradio, path="/gradio/analisis")
 async def root(request: Request, user: User = Depends(get_current_user)):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-    return templates.TemplateResponse(request, "dashboard.html", {"user": user, "active_page": "dashboard"})
+    return templates.TemplateResponse(request, "dashboard.html", {
+        "user": user,
+        "active_page": "dashboard",
+        # Statistik dihitung dari basis data, bukan angka tempelan.
+        "stat": db.statistik_user(user.id_user),
+    })
 
 @app.get("/app/{app_name}", response_class=HTMLResponse)
 async def show_app(request: Request, app_name: str, user: User = Depends(get_current_user)):
@@ -77,7 +89,10 @@ async def show_app(request: Request, app_name: str, user: User = Depends(get_cur
         return RedirectResponse(url="/login", status_code=302)
 
     app_map = {
-        "analisis": {"title": "Modul Analisis Audio", "iframe_src": "/gradio/analisis"},
+        # __theme=light memaksa Gradio tampil terang. Tanpa ini Gradio
+        # mengikuti preferensi sistem; pada mode gelap modul menjadi hitam
+        # dan bertabrakan dengan shell aplikasi yang terang.
+        "analisis": {"title": "Modul Analisis Audio", "iframe_src": "/gradio/analisis?__theme=light"},
         "histori": {"title": "Histori & Arsip", "iframe_src": "/histori-content"},
         "nilai": {"title": "Penilaian & Umpan Balik", "iframe_src": "/nilai-content"},
     }

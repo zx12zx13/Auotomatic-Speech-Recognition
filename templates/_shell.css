@@ -1,0 +1,166 @@
+/* ============================================================
+   Kerangka aplikasi (shell): sidebar gelap + header + area isi.
+   Dipakai bersama oleh dashboard.html dan app_view.html agar
+   keduanya tidak menyalin CSS yang sama dua kali.
+   ============================================================ */
+body {
+    background: var(--kertas);
+    display: flex;
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+    width: 264px;
+    background: linear-gradient(180deg, var(--malam) 0%, var(--malam-2) 100%);
+    height: 100vh;
+    position: fixed;
+    inset: 0 auto 0 0;
+    padding: 1.6rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    color: var(--krem);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.2rem 0.6rem 1.4rem;
+    border-bottom: 1px solid rgba(237, 231, 217, 0.14);
+    margin-bottom: 1.4rem;
+}
+.logo .nama {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.22rem;
+    letter-spacing: 0.01em;
+    color: var(--krem);
+    line-height: 1.15;
+}
+.logo .nama small {
+    display: block;
+    font-family: var(--f-mono);
+    font-size: 0.62rem;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(237, 231, 217, 0.55);
+    margin-top: 0.25rem;
+}
+
+.sidebar-nav { display: flex; flex-direction: column; gap: 0.25rem; }
+.sidebar-nav a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.72rem 0.9rem;
+    color: rgba(237, 231, 217, 0.72);
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: background-color 0.18s, color 0.18s;
+}
+.sidebar-nav a .icon {
+    width: 20px;
+    text-align: center;
+    font-size: 1.05rem;
+    opacity: 0.9;
+}
+.sidebar-nav a:hover {
+    background: rgba(237, 231, 217, 0.08);
+    color: var(--krem);
+}
+.sidebar-nav a.active {
+    background: rgba(237, 231, 217, 0.12);
+    color: #fff;
+}
+.sidebar-nav a.active::before {
+    content: "";
+    position: absolute;
+    left: -1.1rem;
+    top: 20%;
+    height: 60%;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--amber);
+}
+
+.user-profile {
+    margin-top: auto;
+    border-top: 1px solid rgba(237, 231, 217, 0.14);
+    padding-top: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+.user-profile .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--amber);
+    color: var(--malam);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-family: var(--f-display);
+    font-size: 1.1rem;
+}
+.user-profile .username { font-weight: 600; color: var(--krem); }
+.user-profile .peran {
+    display: block;
+    font-family: var(--f-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(237, 231, 217, 0.5);
+    margin-top: 0.15rem;
+}
+
+/* ---------- Area utama ---------- */
+.main-wrapper {
+    margin-left: 264px;
+    width: calc(100% - 264px);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    background: var(--kartu);
+    height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2.2rem;
+    border-bottom: 1px solid var(--garis);
+    flex-shrink: 0;
+}
+.header h1 {
+    font-family: var(--f-display);
+    font-size: 1.45rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--tinta);
+}
+
+.logout-form button {
+    background: transparent;
+    border: 1px solid var(--garis-tegas);
+    color: var(--redup);
+    cursor: pointer;
+    font-family: var(--f-body);
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 0.55rem 1.2rem;
+    border-radius: 9px;
+    transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+.logout-form button:hover {
+    border-color: var(--merah);
+    color: var(--merah);
+    background: var(--merah-bg);
+}

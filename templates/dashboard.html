@@ -1,297 +1,217 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Portal Edukasi Audio</title>
+    <title>Dashboard - Sistem Evaluasi Respons Lisan</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
-
-        :root {
-            --primary-color: #2a6fdb;
-            --secondary-color: #1a5bb8;
-            --background-color: #f4f7fc;
-            --sidebar-bg: #ffffff;
-            --widget-bg: #ffffff;
-            --text-color: #333;
-            --heading-color: #102a43;
-            --subtle-text: #627d98;
-            --border-color: #e2e8f0;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--background-color);
-            margin: 0;
-            color: var(--text-color);
-            display: flex;
-        }
-
-        .sidebar {
-            width: 260px;
-            background-color: var(--sidebar-bg);
-            height: 100vh;
-            position: fixed;
-            left: 0;
-            top: 0;
-            border-right: 1px solid var(--border-color);
-            padding: 1.5rem;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .sidebar .logo {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            text-align: center;
-            margin-bottom: 2.5rem;
-        }
-
-        .sidebar-nav a {
-            display: flex;
-            align-items: center;
-            padding: 0.9rem 1rem;
-            color: var(--subtle-text);
-            text-decoration: none;
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            transition: background-color 0.2s, color 0.2s;
-        }
-        .sidebar-nav a:hover, .sidebar-nav a.active {
-            background-color: #eaf1fb;
-            color: var(--primary-color);
-        }
-        .sidebar-nav a .icon {
-            margin-right: 1rem;
-            font-size: 1.2rem;
-            width: 20px;
-            text-align: center;
-        }
-
-        .user-profile {
-            margin-top: auto;
-            border-top: 1px solid var(--border-color);
-            padding-top: 1.5rem;
-            display: flex;
-            align-items: center;
-        }
-        .user-profile .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background-color: var(--primary-color);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            margin-right: 1rem;
-        }
-        .user-profile .username {
-            font-weight: 500;
-        }
-
-
-        .main-wrapper {
-            margin-left: 260px;
-            width: calc(100% - 260px);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .header {
-            background-color: var(--widget-bg);
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 2rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .header h1 {
-            font-size: 1.5rem;
-            color: var(--heading-color);
-            margin: 0;
-        }
-        
-        .logout-form button {
-            background: var(--primary-color);
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            padding: 0.7rem 1.4rem;
-            border-radius: 8px;
-            transition: background-color 0.2s;
-        }
-        .logout-form button:hover {
-            background-color: var(--secondary-color);
-        }
+        {% include "_tokens.css" %}
+        {% include "_shell.css" %}
 
         .content {
-            padding: 2rem;
+            padding: 2.2rem;
+            overflow-y: auto;
         }
 
+        .sapaan {
+            margin: 0 0 1.8rem;
+        }
+        .sapaan h2 {
+            font-family: var(--f-display);
+            font-weight: 600;
+            font-size: 1.7rem;
+            margin: 0 0 0.3rem;
+        }
+        .sapaan p {
+            margin: 0;
+            color: var(--redup);
+            font-size: 0.95rem;
+        }
+
+        /* ---------- Kartu statistik ---------- */
         .info-cards {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 1.1rem;
+            margin-bottom: 2.2rem;
         }
-
         .info-card {
-            background-color: var(--widget-bg);
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: var(--shadow);
+            background: var(--kartu);
+            border: 1px solid var(--garis);
+            border-radius: 14px;
+            padding: 1.2rem 1.3rem 1.1rem;
+            box-shadow: var(--bayang);
         }
         .info-card h3 {
-            margin: 0 0 0.5rem 0;
-            color: var(--subtle-text);
-            font-size: 1rem;
+            margin: 0 0 0.6rem;
+            font-family: var(--f-mono);
+            font-size: 0.66rem;
             font-weight: 500;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--redup);
         }
         .info-card .value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--heading-color);
+            font-family: var(--f-mono);
+            font-size: 1.9rem;
+            font-weight: 600;
+            color: var(--tinta);
+            margin: 0;
+            line-height: 1;
+        }
+        .info-card .value small {
+            font-size: 0.85rem;
+            font-weight: 400;
+            color: var(--redup);
         }
 
+        /* ---------- Kartu modul ---------- */
         .module-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.1rem;
         }
-
         .module-card {
-            background-color: var(--widget-bg);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
+            position: relative;
+            background: var(--kartu);
+            border: 1px solid var(--garis);
+            border-radius: 14px;
+            padding: 1.5rem 1.5rem 1.3rem;
+            box-shadow: var(--bayang);
             display: flex;
             flex-direction: column;
-            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: inherit;
+            overflow: hidden;
+            transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+        }
+        .module-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 5px;
+            background: var(--pinus);
+            opacity: 0.85;
         }
         .module-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 7px 14px rgba(0,0,0,0.08);
+            transform: translateY(-3px);
+            box-shadow: var(--bayang-besar);
+            border-color: var(--garis-tegas);
         }
-
-        .module-card .header {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            padding: 1.5rem;
-            height: auto;
-            border: none;
+        .module-card .nomor {
+            font-family: var(--f-mono);
+            font-size: 0.68rem;
+            letter-spacing: 0.14em;
+            color: var(--amber);
+            margin-bottom: 0.7rem;
         }
-        .module-card .header h2 {
-            margin: 0;
-            font-size: 1.3rem;
+        .module-card h2 {
+            font-family: var(--f-display);
+            font-weight: 600;
+            font-size: 1.18rem;
+            margin: 0 0 0.55rem;
         }
-
-        .module-card .body {
-            padding: 1.5rem;
+        .module-card p {
+            margin: 0 0 1.4rem;
+            line-height: 1.6;
+            color: var(--redup);
+            font-size: 0.92rem;
             flex-grow: 1;
         }
-        .module-card .body p {
-            margin: 0 0 1.5rem 0;
-            line-height: 1.6;
-            color: var(--subtle-text);
+        .module-card .buka {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--pinus);
         }
-
-        .module-card .footer {
-            padding: 1rem 1.5rem;
-            border-top: 1px solid var(--border-color);
-            text-align: right;
+        .module-card .buka::after {
+            content: " \2192";
+            transition: margin-left 0.18s;
         }
-        .module-card .footer a {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 0.6rem 1.2rem;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-        .module-card .footer a:hover {
-            background-color: var(--secondary-color);
-        }
-
+        .module-card:hover .buka::after { margin-left: 4px; }
     </style>
 </head>
 <body>
     <aside class="sidebar">
-        <div class="logo">Sistem Evaluasi</div>
+        <div class="logo">
+            <span class="gelombang" aria-hidden="true">
+                <i style="--t:.4"></i><i style="--t:.8"></i><i style="--t:1"></i><i style="--t:.55"></i><i style="--t:.75"></i>
+            </span>
+            <div class="nama">Evaluasi Lisan<small>ASR &middot; Rubrik LLM</small></div>
+        </div>
         <nav class="sidebar-nav">
-            <a href="/" class="active"><span class="icon"></span> Dashboard</a>
-            <a href="/app/analisis"><span class="icon"></span> Analisis Audio</a>
-            <a href="/app/histori"><span class="icon"></span> Histori</a>
-            <a href="/app/nilai"><span class="icon"></span> Penilaian</a>
+            <a href="/" class="{{ 'active' if active_page == 'dashboard' else '' }}"><span class="icon">&#9632;</span> Dashboard</a>
+            <a href="/app/analisis" class="{{ 'active' if active_page == 'analisis' else '' }}"><span class="icon">&#9835;</span> Analisis Audio</a>
+            <a href="/app/histori" class="{{ 'active' if active_page == 'histori' else '' }}"><span class="icon">&#9776;</span> Histori</a>
+            <a href="/app/nilai" class="{{ 'active' if active_page == 'nilai' else '' }}"><span class="icon">&#10003;</span> Penilaian</a>
         </nav>
         <div class="user-profile">
             <div class="avatar">{{ user.username[0] | upper }}</div>
-            <div class="username">{{ user.username }}</div>
+            <div>
+                <div class="username">{{ user.username }}</div>
+                <span class="peran">Guru</span>
+            </div>
         </div>
     </aside>
 
     <div class="main-wrapper">
         <header class="header">
-            <h1>Dashboard Utama</h1>
+            <h1>Dashboard</h1>
             <form class="logout-form" action="/logout" method="post">
-                <button type="submit">Logout</button>
+                <button type="submit">Keluar</button>
             </form>
         </header>
 
         <main class="content">
+            <div class="sapaan">
+                <h2>Selamat datang, {{ user.username }}</h2>
+                <p>Ringkasan seluruh proses evaluasi respons lisan Anda.</p>
+            </div>
+
             <section class="info-cards">
                 <div class="info-card">
-                    <h3>Proses Bulan Ini</h3>
-                    <p class="value">12</p>
+                    <h3>Audio Diproses</h3>
+                    <p class="value">{{ stat.jumlah_audio }}</p>
                 </div>
                 <div class="info-card">
-                    <h3>Skor Rata-Rata</h3>
-                    <p class="value">91%</p>
+                    <h3>Total Durasi</h3>
+                    <p class="value">{{ stat.total_durasi | durasi }}</p>
                 </div>
                 <div class="info-card">
-                    <h3>Pengguna Aktif</h3>
-                    <p class="value">1</p>
+                    <h3>Sudah Dinilai</h3>
+                    <p class="value">{{ stat.jumlah_penilaian }}</p>
                 </div>
                 <div class="info-card">
-                    <h3>Modul Tersedia</h3>
-                    <p class="value">3</p>
+                    <h3>Skor Rata-rata</h3>
+                    {% if stat.rata_skor is not none %}
+                    <p class="value">{{ "%.2f" | format(stat.rata_skor) }} <small>/ 4</small></p>
+                    {% else %}
+                    <p class="value"><small>belum ada</small></p>
+                    {% endif %}
                 </div>
             </section>
 
             <section class="module-grid">
-                <div class="module-card">
-                    <div class="header"><h2> Modul Analisis Audio</h2></div>
-                    <div class="body">
-                        <p>Unggah file audio untuk transkripsi, identifikasi pembicara, dan analisis teks dalam satu antarmuka terpadu.</p>
-                    </div>
-                    <div class="footer"><a href="/app/analisis">Buka Modul</a></div>
-                </div>
-
-                <div class="module-card">
-                    <div class="header"><h2> Histori & Arsip</h2></div>
-                    <div class="body">
-                        <p>Akses kembali semua pekerjaan yang telah Anda selesaikan. Tinjau transkrip dan hasil diarisasi sebelumnya.</p>
-                    </div>
-                    <div class="footer"><a href="/app/histori">Lihat Arsip</a></div>
-                </div>
-
-                <div class="module-card">
-                    <div class="header"><h2> Penilaian & Umpan Balik</h2></div>
-                    <div class="body">
-                        <p>Gunakan model AI canggih untuk menilai akurasi transkrip Anda dan dapatkan umpan balik untuk perbaikan.</p>
-                    </div>
-                    <div class="footer"><a href="/app/nilai">Lihat Penilaian</a></div>
-                </div>
+                <a class="module-card" href="/app/analisis">
+                    <span class="nomor">MODUL 01</span>
+                    <h2>Analisis Audio</h2>
+                    <p>Unggah atau rekam respons lisan siswa. Sistem mentranskripsi,
+                       memisahkan pembicara, lalu menilai jawaban berdasarkan rubrik.</p>
+                    <span class="buka">Buka modul</span>
+                </a>
+                <a class="module-card" href="/app/histori">
+                    <span class="nomor">MODUL 02</span>
+                    <h2>Histori &amp; Arsip</h2>
+                    <p>Seluruh proses yang pernah dijalankan: transkrip, dialog per
+                       pembicara, dan hasil penilaiannya tersimpan di sini.</p>
+                    <span class="buka">Lihat arsip</span>
+                </a>
+                <a class="module-card" href="/app/nilai">
+                    <span class="nomor">MODUL 03</span>
+                    <h2>Penilaian &amp; Umpan Balik</h2>
+                    <p>Rekap skor rubrik per indikator beserta umpan balik naratif
+                       untuk setiap jawaban siswa yang dinilai.</p>
+                    <span class="buka">Lihat penilaian</span>
+                </a>
             </section>
         </main>
     </div>

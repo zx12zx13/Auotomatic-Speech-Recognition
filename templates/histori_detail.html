@@ -5,19 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detail Proses</title>
     <style>
+        {% include "_tokens.css" %}
         {% include "_konten.css" %}
-        .blok { margin-bottom: 2rem; }
+        .blok { margin-bottom: 2.2rem; }
         .transkrip {
-            background: #f8fafc;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            background: var(--pinus-muda);
+            border: 1px solid var(--garis);
+            border-left: 4px solid var(--pinus);
+            border-radius: 10px;
             padding: 1rem 1.2rem;
             white-space: pre-wrap;
-            line-height: 1.6;
-            font-size: 0.95rem;
+            line-height: 1.65;
+            font-size: 0.93rem;
         }
-        .kembali { display: inline-block; margin-bottom: 1rem; }
-        .meta { color: var(--subtle-text); font-size: 0.9rem; }
+        .kembali {
+            display: inline-block;
+            margin-bottom: 1.2rem;
+            font-size: 0.88rem;
+        }
+        .meta {
+            color: var(--redup);
+            font-family: var(--f-mono);
+            font-size: 0.78rem;
+            margin: 0 0 1.8rem;
+        }
     </style>
 </head>
 <body>

@@ -111,6 +111,19 @@ Rincian lengkap per TC-ID, penyesuaian terhadap Lampiran 5, dan cara menjalankan
 
 ## Temuan / Bug
 
+### ✅ BUG-12 — Rekam mikrofon tidak menghasilkan audio (Tinggi) — **DIPERBAIKI**
+**Dilaporkan pengguna (20 Juli 2026).** Dua cacat terpisah, masing-masing cukup untuk menggagalkan perekaman:
+1. Modul analisis dimuat dalam `<iframe>` tanpa atribut `allow="microphone"`, sehingga peramban memblokir akses mikrofon di dalam iframe — tombol rekam tampil normal tetapi tidak menghasilkan apa pun.
+2. Rekaman mikrofon dikirim peramban sebagai `.webm`, sedangkan `validate_audio()` hanya menerima `.wav`/`.mp3` — rekaman langsung ditolak pada validasi.
+
+Perbaikan: `allow="microphone"` ditambahkan pada iframe (`app_view.html`); komponen audio dipaku `format="wav"` dan `sources=["upload", "microphone"]` (`app.py`).
+Catatan pemakaian: mikrofon hanya diizinkan peramban pada `http://localhost` atau HTTPS — akses lewat IP jaringan (mis. dari HP) tetap diblokir. Perlu dipertimbangkan untuk pengambilan data di sekolah.
+
+### ✅ BUG-13 — Tema Gradio tidak pernah aktif: Gradio 6 menelan argumen `theme`/`css` diam-diam (Rendah, UI) — **DIPERBAIKI**
+Pada Gradio 6, `gr.Blocks.__init__` tidak lagi menerima `theme` dan `css` — keduanya masuk `**kwargs` dan **dibuang tanpa peringatan**, sehingga tema kustom tampak "terpasang" di kode tetapi tidak pernah tersaji. Keduanya kini wajib diberikan ke `gr.mount_gradio_app(...)` (dipakai `main.py`) atau `launch(...)`.
+Ditemukan juga: Gradio mengikuti preferensi gelap/terang sistem, sehingga modul bisa tampil hitam di dalam shell yang terang. Dipaksa terang lewat `?__theme=light` pada URL iframe.
+Verifikasi via DOM: `body.className` tanpa `dark`, latar `#f6f3ec`, `--font: 'Schibsted Grotesk'`.
+
 ### ✅ BUG-01 — Pra-pemrosesan audio tidak pernah berjalan (Tinggi) — **DIPERBAIKI**
 `preprocess_audio()` memanggil `nr.reduce_noise(...)`, tetapi **`noisereduce` tidak pernah di-import**. Setiap pemanggilan melempar `NameError`, tertangkap oleh `except Exception`, lalu fungsi mengembalikan path audio **asli**. Akibatnya normalisasi volume dan noise reduction — KF #2 serta tahap pipeline [3] dan [4] — tidak pernah benar-benar terjadi.
 

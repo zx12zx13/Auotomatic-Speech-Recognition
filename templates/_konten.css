@@ -1,104 +1,130 @@
-/* Gaya bersama untuk halaman konten yang ditampilkan di dalam iframe.
-   Disertakan lewat tag include Jinja agar Histori dan Penilaian tidak
-   menyalin CSS yang sama dua kali. */
-:root {
-    --primary-color: #2a6fdb;
-    --background-color: #f4f7fc;
-    --widget-bg: #ffffff;
-    --heading-color: #102a43;
-    --subtle-text: #627d98;
-    --border-color: #e2e8f0;
-}
+/* ============================================================
+   Gaya bersama untuk halaman konten di dalam iframe
+   (Histori, Penilaian, Detail). Disertakan lewat tag include Jinja
+   agar ketiga halaman tidak menyalin CSS yang sama.
+   Token warna/huruf berasal dari _tokens.css (disertakan lebih
+   dahulu oleh masing-masing halaman).
+   ============================================================ */
 body {
-    font-family: 'Roboto', sans-serif;
-    background-color: var(--background-color);
-    margin: 0;
-    padding: 2rem;
-    color: #333;
+    background: var(--kertas);
+    padding: 1.8rem;
 }
+
 .container {
-    background-color: var(--widget-bg);
-    padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.07);
+    background: var(--kartu);
+    padding: 1.9rem 2rem;
+    border: 1px solid var(--garis);
+    border-radius: 14px;
+    box-shadow: var(--bayang);
 }
+
 h1 {
-    color: var(--heading-color);
-    margin-top: 0;
-    margin-bottom: 0.4rem;
-    font-size: 1.5rem;
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.4rem;
+    margin: 0 0 0.35rem;
+}
+h2 {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin: 0 0 0.8rem;
 }
 .subjudul {
-    color: var(--subtle-text);
-    margin-top: 0;
-    margin-bottom: 1.5rem;
+    color: var(--redup);
+    margin: 0 0 1.6rem;
     font-size: 0.9rem;
 }
+
+/* ---------- Tabel bergaya lembar penilaian ---------- */
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 1rem;
+    margin-top: 0.4rem;
 }
 th, td {
-    border: 1px solid var(--border-color);
-    padding: 0.8rem 1rem;
+    padding: 0.75rem 0.9rem;
     text-align: left;
     vertical-align: top;
+    border-bottom: 1px solid var(--garis);
+    font-size: 0.92rem;
 }
-th {
-    background-color: #f8fafc;
+thead th {
+    font-family: var(--f-mono);
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--redup);
+    border-bottom: 2px solid var(--garis-tegas);
+    background: transparent;
+}
+tbody th {
     font-weight: 600;
-    color: var(--heading-color);
+    color: var(--tinta);
+    width: 11rem;
+    background: transparent;
 }
-tbody tr:nth-child(even) {
-    background-color: #f8fafc;
-}
-a {
-    color: var(--primary-color);
-    text-decoration: none;
-}
-a:hover {
-    text-decoration: underline;
-}
+tbody tr:hover { background: rgba(30, 92, 70, 0.035); }
+
+a { color: var(--pinus); font-weight: 600; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---------- Keadaan kosong ---------- */
 .kosong {
     text-align: center;
-    padding: 3rem 1rem;
-    color: var(--subtle-text);
+    padding: 3.2rem 1rem;
+    color: var(--redup);
+    line-height: 1.6;
 }
 .kosong strong {
     display: block;
-    color: var(--heading-color);
-    font-size: 1.05rem;
-    margin-bottom: 0.5rem;
+    font-family: var(--f-display);
+    color: var(--tinta);
+    font-size: 1.1rem;
+    margin-bottom: 0.4rem;
 }
+
+/* ---------- Lencana status ---------- */
 .badge {
     display: inline-block;
-    padding: 0.2rem 0.6rem;
+    font-family: var(--f-mono);
+    padding: 0.18rem 0.65rem;
     border-radius: 999px;
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-weight: 500;
+    letter-spacing: 0.04em;
 }
-.badge-selesai { background: #e3f9e5; color: #207227; }
-.badge-diproses { background: #fff4e0; color: #8a5a00; }
+.badge-selesai  { background: var(--hijau-ok-bg); color: var(--hijau-ok); }
+.badge-diproses { background: var(--kuning-proses-bg); color: var(--kuning-proses); }
+
+/* ---------- Skor ---------- */
 .skor {
-    font-weight: 700;
-    color: var(--heading-color);
-}
-.skor-kosong {
-    color: var(--subtle-text);
-    font-style: italic;
-    font-weight: 400;
-}
-.umpan-balik {
-    max-width: 28rem;
-    font-size: 0.9rem;
-    line-height: 1.5;
-}
-.indikator {
-    font-size: 0.85rem;
+    font-family: var(--f-mono);
+    font-weight: 600;
+    color: var(--pinus);
     white-space: nowrap;
 }
+.skor-kosong {
+    color: var(--redup);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 0.88rem;
+}
+
+.umpan-balik {
+    max-width: 28rem;
+    font-size: 0.88rem;
+    line-height: 1.55;
+}
+
+.indikator { font-size: 0.85rem; }
 .indikator span {
     display: inline-block;
-    margin-right: 0.6rem;
+    margin: 0 0.6rem 0.2rem 0;
+    white-space: nowrap;
+}
+.indikator strong {
+    font-family: var(--f-mono);
+    color: var(--pinus);
 }

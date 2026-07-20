@@ -1,55 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - Audio Portal</title>
+    <title>Daftar - Sistem Evaluasi Respons Lisan</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8f9fa; margin: 0; }
-        .register-container { background: #fff; padding: 2rem 3rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-        .register-container h1 { color: #0d6efd; margin-bottom: 0.5rem; }
-        .register-container p { color: #6c757d; margin-bottom: 1.5rem; }
-        .form-group { margin-bottom: 1.5rem; text-align: left; }
-        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #495057; }
-        .form-group input { width: 100%; padding: 0.75rem; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box; }
-        .btn-register { background: #0d6efd; color: white; padding: 0.75rem; width: 100%; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
-        .btn-register:hover { background: #0b5ed7; }
-        .login-link { margin-top: 1.5rem; color: #495057; }
-        .login-link a { color: #0d6efd; text-decoration: none; }
-        .error { color: #dc3545; background: #f8d7da; border: 1px solid #f5c2c7; padding: 0.75rem; border-radius: 4px; margin-bottom: 1.5rem; }
-        .success { color: #0f5132; background: #d1e7dd; border: 1px solid #badbcc; padding: 0.75rem; border-radius: 4px; margin-bottom: 1.5rem; }
+        {% include "_tokens.css" %}
+        {% include "_auth.css" %}
     </style>
 </head>
 <body>
-    <div class="register-container">
-        <h1>Buat Akun Baru</h1>
-        <p>Isi formulir di bawah ini untuk mendaftar.</p>
+    <div class="kartu-auth">
+        <span class="gelombang" aria-hidden="true">
+            <i style="--t:.35; --d:0s"></i><i style="--t:.7; --d:.12s"></i><i style="--t:1; --d:.24s"></i><i style="--t:.55; --d:.36s"></i><i style="--t:.85; --d:.48s"></i><i style="--t:.4; --d:.6s"></i><i style="--t:.65; --d:.72s"></i>
+        </span>
+        <h1>Buat Akun Guru</h1>
+        <p class="tagline">Sistem Evaluasi Respons Lisan</p>
 
         {% if error %}
-            <div class="error">{{ error }}</div>
+        <p class="error" style="margin: 0 0 1.2rem">{{ error }}</p>
         {% endif %}
         {% if success %}
-            <div class="success">{{ success }}</div>
+        <p class="success" style="margin: 0 0 1.2rem">{{ success }}</p>
         {% endif %}
 
         <form action="/register" method="post">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <div class="form-group">
-                <label for="confirm_password">Konfirmasi Password</label>
-                <input type="password" id="confirm_password" name="confirm_password" required>
-            </div>
-            <button type="submit" class="btn-register">Register</button>
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" autocomplete="username" required>
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="new-password" required>
+            <label for="confirm_password">Konfirmasi Password</label>
+            <input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password" required>
+            <button type="submit">Daftar</button>
         </form>
 
-        <div class="login-link">
-            Sudah punya akun? <a href="/login">Login di sini</a>
+        <div class="tautan-bawah">
+            Sudah punya akun? <a href="/login">Masuk di sini</a>
         </div>
     </div>
 </body>

@@ -32,7 +32,17 @@ whisper.load_model = lambda *a, **k: None
 
 from pyannote.audio import Pipeline  # noqa: E402
 
-Pipeline.from_pretrained = classmethod(lambda cls, *a, **k: None)
+class _PipelineTiruan:
+    """Pengganti pipeline diarisasi saat pengujian.
+
+    Menyediakan .to() karena app.py memindahkan pipeline ke GPU/CPU saat dimuat.
+    """
+
+    def to(self, perangkat):
+        return self
+
+
+Pipeline.from_pretrained = classmethod(lambda cls, *a, **k: _PipelineTiruan())
 
 import app  # noqa: E402
 import main  # noqa: E402

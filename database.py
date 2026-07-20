@@ -266,6 +266,31 @@ def simpan_hasil(id_user, filename, durasi, segmen, full_text, corrected_text,
 # ==============================
 # QUERY HISTORI
 # ==============================
+def statistik_user(id_user):
+    """Menghitung ringkasan untuk kartu statistik dashboard.
+
+    Seluruh angka dihitung dari data sungguhan milik guru yang login --
+    dashboard tidak boleh menampilkan angka tempelan (hardcoded), karena
+    tampilan ini ikut didemonstrasikan sebagai bukti kerja sistem.
+    """
+    with get_conn() as conn:
+        audio = conn.execute(
+            "SELECT COUNT(*) AS n, COALESCE(SUM(duration), 0) AS total_durasi "
+            "FROM audio WHERE id_user = ?",
+            (id_user,),
+        ).fetchone()
+        nilai = conn.execute(
+            "SELECT COUNT(*) AS n, AVG(score) AS rata FROM assessment WHERE id_user = ?",
+            (id_user,),
+        ).fetchone()
+    return {
+        "jumlah_audio": audio["n"],
+        "total_durasi": audio["total_durasi"],
+        "jumlah_penilaian": nilai["n"],
+        "rata_skor": nilai["rata"],  # None bila belum ada penilaian
+    }
+
+
 def ambil_histori(id_user):
     """Mengambil daftar proses milik satu guru, terbaru lebih dahulu."""
     with get_conn() as conn:

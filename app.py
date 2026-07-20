@@ -1,6 +1,7 @@
 import os
 import warnings
 import gradio as gr
+import torch
 import whisper
 from pyannote.audio import Pipeline
 from pyannote.core import Segment, Annotation
@@ -35,16 +36,38 @@ MAX_SPEAKERS = 5
 # ==============================
 # LOAD MODELS
 # ==============================
-print("Memuat Whisper...")
-whisper_model = whisper.load_model("medium")
+# Memakai GPU bila tersedia. Whisper "medium" di CPU berjalan jauh lebih lambat
+# daripada durasi rekamannya sendiri; di GPU prosesnya berkali-kali lipat lebih
+# cepat. Deteksi otomatis, sehingga kode yang sama tetap jalan di mesin tanpa GPU.
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-print("Memuat Pyannote (diarization)...")
+# Ukuran model dapat diturunkan lewat .env (mis. "small") untuk mempercepat
+# pengembangan. PERINGATAN: ukuran model memengaruhi mutu transkripsi, sehingga
+# seluruh pengambilan data penelitian harus memakai SATU ukuran yang sama.
+# Catat ukuran yang dipakai di laporan.
+WHISPER_MODEL = os.getenv("WHISPER_MODEL") or "medium"
+
+# Bahasa dipaku ke Indonesia: tanpa ini Whisper menjalankan deteksi bahasa lebih
+# dahulu, dan pada rekaman kelas yang berisik bahasa kerap salah terdeteksi --
+# hasilnya transkrip kacau sekaligus proses yang lebih lambat.
+BAHASA = os.getenv("WHISPER_LANGUAGE") or "id"
+
+print(f"Memuat Whisper ({WHISPER_MODEL}) di {DEVICE.upper()}...")
+whisper_model = whisper.load_model(WHISPER_MODEL, device=DEVICE)
+
+print(f"Memuat Pyannote (diarization) di {DEVICE.upper()}...")
 diarization_pipeline = Pipeline.from_pretrained(
     "pyannote/speaker-diarization-3.1",
     use_auth_token=HF_TOKEN
 )
+diarization_pipeline.to(torch.device(DEVICE))
 
 print("Semua model siap.")
+if DEVICE == "cpu":
+    print(
+        "CATATAN: GPU tidak terdeteksi, proses berjalan di CPU dan akan lambat.\n"
+        "         Bila mesin ini punya GPU NVIDIA, pasang PyTorch versi CUDA."
+    )
 
 # ==============================
 # PYANNOTE DIARIZATION HELPER
@@ -199,7 +222,14 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
     try:
         # 1. Transkripsi Whisper
         print("Mulai transkripsi Whisper...")
-        result = whisper_model.transcribe(processed_audio, verbose=False)
+        result = whisper_model.transcribe(
+            processed_audio,
+            verbose=False,
+            language=BAHASA,
+            # fp16 hanya sahih di GPU; di CPU pemakaiannya justru memicu
+            # peringatan dan pemrosesan mundur ke fp32.
+            fp16=(DEVICE == "cuda"),
+        )
         full_text = result.get("text", "Transkripsi gagal.").strip()
         print("Transkripsi Whisper selesai.")
 
@@ -339,13 +369,56 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
 # ==============================
 # GRADIO UNIFIED INTERFACE
 # ==============================
+# Tema diselaraskan dengan shell FastAPI (kertas hangat + hijau pinus) agar
+# modul Gradio di dalam iframe tidak terlihat seperti aplikasi lain yang
+# ditempel. PENTING: pada Gradio 6, theme/css TIDAK lagi diterima gr.Blocks
+# (masuk **kwargs dan ditelan diam-diam) -- keduanya harus diberikan ke
+# mount_gradio_app() (dipakai main.py) atau launch().
+def tema_modul():
+    return gr.themes.Soft(
+        primary_hue="emerald",
+        neutral_hue="stone",
+        font=[gr.themes.GoogleFont("Schibsted Grotesk"), "system-ui", "sans-serif"],
+        font_mono=[gr.themes.GoogleFont("Spline Sans Mono"), "Consolas", "monospace"],
+    )
+
+
+CSS_SELARAS = """
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap');
+.gradio-container { background: #f6f3ec !important; }
+#judul-modul h1 {
+    font-family: 'Fraunces', Georgia, serif !important;
+    font-weight: 600;
+    color: #1c2a24;
+    margin-bottom: 0.2rem;
+}
+#judul-modul p { color: #6d7a70; margin-top: 0; }
+"""
+
+
 def create_unified_app():
-    with gr.Blocks(title="ASR & Diarization") as demo:
-        gr.Markdown("<h1 style='text-align:center'> Analisis Audio Lengkap</h1><p style='text-align:center'>Unggah file audio untuk transkripsi, identifikasi pembicara, dan analisis teks.</p>")
+    with gr.Blocks(title="Analisis Audio") as demo:
+        gr.Markdown(
+            "<h1>Analisis Audio</h1>"
+            "<p>Unggah atau rekam respons lisan siswa untuk transkripsi, "
+            "identifikasi pembicara, dan penilaian rubrik.</p>",
+            elem_id="judul-modul",
+        )
         
         with gr.Row():
             with gr.Column(scale=1):
-                audio_input = gr.Audio(label="Upload Audio", type="filepath")
+                # sources ditulis eksplisit agar tombol rekam tidak hilang bila
+                # nilai bawaan Gradio berubah di versi mendatang.
+                #
+                # format="wav" WAJIB: rekaman mikrofon peramban dikirim sebagai
+                # .webm, sedangkan validate_audio hanya menerima .wav/.mp3 --
+                # sehingga rekaman langsung ditolak sebelum sempat diproses.
+                audio_input = gr.Audio(
+                    label="Unggah atau Rekam Audio",
+                    sources=["upload", "microphone"],
+                    type="filepath",
+                    format="wav",
+                )
                 topik_input = gr.Textbox(
                     lines=3,
                     label="Topik / Pertanyaan",
@@ -381,5 +454,5 @@ def create_unified_app():
 
 if __name__ == "__main__":
     # Menjalankan modul analisis secara mandiri, terpisah dari shell FastAPI di main.py.
-    # Untuk aplikasi penuh (login, dashboard, histori), gunakan: uvicorn main:app --reload
-    create_unified_app().launch()
+    # Untuk aplikasi penuh (login, dashboard, histori), gunakan: python run_server.py
+    create_unified_app().launch(theme=tema_modul(), css=CSS_SELARAS)
