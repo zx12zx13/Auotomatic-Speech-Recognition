@@ -189,6 +189,158 @@ class UjiPraPemrosesanTeks(unittest.TestCase):
         self.assertLess(hasil.find("satu"), hasil.find("dua"))
 
 
+class UjiKoreksiASR(unittest.TestCase):
+    """WB-019b — koreksi salah dengar ASR oleh LLM (tahap [9] lanjutan).
+
+    Seluruh uji memakai pemanggil LLM tiruan sehingga tidak menyentuh jaringan
+    dan tidak mengirim data ke pihak ketiga.
+    """
+
+    @staticmethod
+    def _pemanggil(teks_koreksi, perubahan=None):
+        """Membuat pemanggil tiruan yang selalu mengembalikan teks tertentu."""
+        import json
+
+        def palsu(pesan):
+            return json.dumps({
+                "teks_koreksi": teks_koreksi,
+                "perubahan": perubahan or [],
+            })
+        return palsu
+
+    def test_wb019b_koreksi_wajar_diterapkan(self):
+        from text_preprocessing import koreksi_asr_llm
+        asli = "Yang pertama hater, kedua software, ketiga bernanya."
+        h = koreksi_asr_llm(
+            asli, "Sistem Komputer",
+            pemanggil=self._pemanggil(
+                "Yang pertama hardware, kedua software, ketiga brainware.",
+                [{"asli": "hater", "koreksi": "hardware"}],
+            ),
+        )
+        self.assertTrue(h["diterapkan"])
+        self.assertIn("hardware", h["teks"])
+        self.assertEqual(h["asli"], asli)
+        self.assertEqual(h["perubahan"], [("hater", "hardware")])
+
+    def test_wb019c_koreksi_menambah_kalimat_ditolak(self):
+        """Model yang menjawab topik alih-alih mengoreksi harus ditolak."""
+        from text_preprocessing import koreksi_asr_llm
+        asli = "Yang pertama hater, kedua software, ketiga bernanya."
+        panjang = asli + " " + ("Sistem komputer adalah gabungan perangkat. " * 5)
+        h = koreksi_asr_llm(asli, None, pemanggil=self._pemanggil(panjang))
+        self.assertFalse(h["diterapkan"])
+        self.assertEqual(h["teks"], asli)   # teks asli dipertahankan
+        self.assertIn("DITOLAK", h["catatan"])
+
+    def test_wb019d_koreksi_terlalu_berbeda_ditolak(self):
+        from text_preprocessing import koreksi_asr_llm
+        asli = "satu dua tiga empat lima enam tujuh delapan."
+        h = koreksi_asr_llm(
+            asli, None,
+            pemanggil=self._pemanggil("alfa bravo charlie delta echo foxtrot golf hotel."),
+        )
+        self.assertFalse(h["diterapkan"])
+        self.assertEqual(h["teks"], asli)
+        self.assertIn("DITOLAK", h["catatan"])
+
+    def test_wb019e_llm_gagal_tidak_membatalkan_transkrip(self):
+        """Kegagalan LLM tidak boleh melempar exception ke pemanggil."""
+        from text_preprocessing import koreksi_asr_llm
+
+        def meledak(pesan):
+            raise ConnectionError("simulasi koneksi terputus")
+
+        asli = "Yang pertama hater, kedua software."
+        h = koreksi_asr_llm(asli, None, pemanggil=meledak)
+        self.assertFalse(h["diterapkan"])
+        self.assertEqual(h["teks"], asli)
+        self.assertIn("gagal dihubungi", h["catatan"])
+
+    def test_wb019f_keluaran_bukan_json_ditolak(self):
+        from text_preprocessing import koreksi_asr_llm
+        asli = "Yang pertama hater, kedua software."
+        h = koreksi_asr_llm(asli, None, pemanggil=lambda p: "maaf saya tidak paham")
+        self.assertFalse(h["diterapkan"])
+        self.assertEqual(h["teks"], asli)
+        self.assertIn("bukan JSON", h["catatan"])
+
+    def test_wb019g_teks_kosong_tidak_memanggil_llm(self):
+        from text_preprocessing import koreksi_asr_llm
+
+        def jangan_dipanggil(pesan):
+            self.fail("LLM tidak boleh dipanggil untuk teks kosong")
+
+        h = koreksi_asr_llm("   ", None, pemanggil=jangan_dipanggil)
+        self.assertFalse(h["diterapkan"])
+        self.assertIn("Tidak ada teks", h["catatan"])
+
+    def test_wb019h_teks_panjang_dipotong(self):
+        """Teks panjang harus dipecah; endpoint gagal bila dikirim sekaligus."""
+        from text_preprocessing import potong_teks, BATAS_KATA_POTONG
+        teks = " ".join(f"kalimat nomor {i} berisi beberapa kata." for i in range(40))
+        potongan = potong_teks(teks)
+        self.assertGreater(len(potongan), 1)
+        for p in potongan:
+            # Satu kalimat utuh boleh melebihi batas, tetapi penggabungan
+            # kalimat tidak boleh.
+            self.assertLessEqual(len(p.split()), BATAS_KATA_POTONG + 10)
+        # Tidak ada kata yang hilang saat dipotong.
+        self.assertEqual(" ".join(potongan).split(), teks.split())
+
+    def test_wb019i_potongan_gagal_tidak_menjatuhkan_potongan_lain(self):
+        """Satu potongan yang gagal tidak boleh membatalkan koreksi lainnya."""
+        import json
+        from text_preprocessing import koreksi_asr_llm
+
+        # Kegagalan ditentukan oleh ISI, bukan urutan panggilan, supaya potongan
+        # yang sama tetap gagal walau dibelah dan dicoba ulang per bagian.
+        def kadang_gagal(pesan):
+            teks = pesan[1]["content"].split("TEKS TRANSKRIP:\n")[1].split("\n\nFORMAT")[0]
+            if "hater" in teks:
+                raise ConnectionError("gagal dihubungi")
+            return json.dumps({"teks_koreksi": teks, "perubahan": []})
+
+        asli = ("Bagian satu berisi kata hater yang salah dengar. "
+                + " ".join(f"Kalimat pengisi nomor {i} supaya teks terpotong." for i in range(20)))
+        h = koreksi_asr_llm(asli, None, pemanggil=kadang_gagal)
+        self.assertTrue(h["diterapkan"])          # sebagian tetap terkoreksi
+        self.assertIn("Tidak terkoreksi", h["catatan"])   # kegagalan terlihat
+        self.assertIn("hater", h["teks"])         # potongan gagal tetap asli
+
+    def test_wb019j_potongan_kehabisan_waktu_dibelah_bukan_diulang(self):
+        """Potongan yang terlalu panjang harus dibelah, lalu berhasil dikoreksi.
+
+        Mengulang teks yang sama percuma: pada transkrip uji, potongan 49 kata
+        gagal dua kali berturut-turut. Yang menolong adalah memperpendeknya.
+        """
+        import json
+        from text_preprocessing import koreksi_asr_llm
+
+        dicoba = []
+
+        def gagal_bila_panjang(pesan):
+            teks = pesan[1]["content"].split("TEKS TRANSKRIP:\n")[1].split("\n\nFORMAT")[0]
+            dicoba.append(len(teks.split()))
+            if len(teks.split()) > 30:
+                raise TimeoutError("the read operation timed out")
+            return json.dumps({"teks_koreksi": teks.replace("hater", "hardware"),
+                               "perubahan": [{"asli": "hater", "koreksi": "hardware"}]})
+
+        # Enam kalimat 7 kata = 42 kata, muat dalam satu potongan tetapi di atas
+        # ambang gagal tiruan; setelah dibelah tiap bagian 21 kata dan lolos.
+        asli = " ".join(f"Kalimat nomor {i} menyebut hater sebagai contoh."
+                        for i in range(6))
+        h = koreksi_asr_llm(asli, None, pemanggil=gagal_bila_panjang)
+
+        self.assertTrue(h["diterapkan"])
+        self.assertNotIn("hater", h["teks"])       # seluruhnya terkoreksi
+        self.assertNotIn("Tidak terkoreksi", h["catatan"])
+        self.assertEqual(dicoba[0], 42)            # percobaan utuh lebih dulu
+        self.assertTrue(all(n <= 21 for n in dicoba[1:]),
+                        f"percobaan ulang harus lebih pendek, bukan {dicoba}")
+
+
 class UjiEvaluatorLLM(unittest.TestCase):
     """WB-020 / WB-021 — prompt builder dan validasi keluaran evaluator.py."""
 

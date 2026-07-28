@@ -1,4 +1,7 @@
 import os
+import re
+import shutil
+import time
 import warnings
 import gradio as gr
 import torch
@@ -11,7 +14,7 @@ from pydub import AudioSegment, effects
 from dotenv import load_dotenv
 
 from evaluator import evaluate_response, format_hasil, EvaluationError
-from text_preprocessing import susun_teks_pembicara, daftar_pembicara
+from text_preprocessing import susun_teks_pembicara, daftar_pembicara, koreksi_asr_llm
 from session import id_user_dari_token
 import database as db
 
@@ -46,14 +49,20 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # seluruh pengambilan data penelitian harus memakai SATU ukuran yang sama.
 # Catat ukuran yang dipakai di laporan.
 WHISPER_MODEL = os.getenv("WHISPER_MODEL") or "medium"
-
-# Bahasa dipaku ke Indonesia: tanpa ini Whisper menjalankan deteksi bahasa lebih
-# dahulu, dan pada rekaman kelas yang berisik bahasa kerap salah terdeteksi --
-# hasilnya transkrip kacau sekaligus proses yang lebih lambat.
 BAHASA = os.getenv("WHISPER_LANGUAGE") or "id"
 
-print(f"Memuat Whisper ({WHISPER_MODEL}) di {DEVICE.upper()}...")
-whisper_model = whisper.load_model(WHISPER_MODEL, device=DEVICE)
+loaded_whisper_models = {}
+
+def get_whisper_model(model_name: str = None):
+    if not model_name:
+        model_name = WHISPER_MODEL
+    if model_name not in loaded_whisper_models:
+        print(f"Memuat Whisper ({model_name}) di {DEVICE.upper()}...")
+        loaded_whisper_models[model_name] = whisper.load_model(model_name, device=DEVICE)
+    return loaded_whisper_models[model_name]
+
+# Pra-muat model default
+whisper_model = get_whisper_model(WHISPER_MODEL)
 
 print(f"Memuat Pyannote (diarization) di {DEVICE.upper()}...")
 diarization_pipeline = Pipeline.from_pretrained(
@@ -99,6 +108,53 @@ SUPPORTED_AUDIO_FORMATS = (".wav", ".mp3")
 class AudioValidationError(Exception):
     """Audio ditolak pada tahap validasi, sebelum masuk pra-pemrosesan."""
     pass
+
+
+# Rekaman yang diunggah lewat Gradio berakhir di direktori sementara sistem
+# operasi dan lenyap setelah beberapa waktu. Agar guru dapat memutar ulang
+# audio dari histori dan mencocokkannya dengan transkrip, satu salinan
+# disimpan di direktori tetap.
+#
+# PERINGATAN PRIVASI: sejak perubahan ini, suara siswa TERSIMPAN PERMANEN di
+# mesin ini, bukan lagi berkas sementara. Rekaman suara adalah data pribadi.
+# Sebelum pengambilan data penelitian, pastikan ada persetujuan (informed
+# consent) siswa/wali, dan cantumkan penyimpanan ini pada bagian etika
+# penelitian. Direktori di bawah sudah masuk .gitignore agar suara siswa tidak
+# ikut terbit ke repositori publik.
+DIR_REKAMAN = os.getenv("DIR_REKAMAN") or "rekaman"
+
+
+def _nama_aman(nama):
+    """Membersihkan nama berkas agar aman dipakai sebagai nama berkas di disk.
+
+    Nama unggahan berasal dari pengguna dan tidak boleh dipercaya: tanpa
+    pembersihan, nama seperti "../../evaluasi.db" dapat membuat penyimpanan
+    menulis ke luar direktori rekaman.
+    """
+    nama = os.path.basename(nama or "rekaman")
+    nama = re.sub(r"[^A-Za-z0-9._-]", "_", nama)
+    return nama[-80:] or "rekaman"
+
+
+def simpan_rekaman(audio_path):
+    """Menyalin rekaman ke direktori tetap; mengembalikan lokasinya atau None.
+
+    Kegagalan penyalinan tidak boleh membatalkan proses yang sudah berjalan:
+    transkrip dan skor tetap sahih walau audionya tidak dapat diputar ulang.
+    Kegagalan dilaporkan ke konsol agar tetap terlihat.
+    """
+    try:
+        os.makedirs(DIR_REKAMAN, exist_ok=True)
+        tujuan = os.path.join(
+            DIR_REKAMAN, f"{int(time.time() * 1000)}_{_nama_aman(audio_path)}"
+        )
+        shutil.copy2(audio_path, tujuan)
+        print(f"Salinan rekaman disimpan: {tujuan}")
+        return tujuan
+    except Exception as e:
+        print(f"PERINGATAN: salinan rekaman GAGAL disimpan ({type(e).__name__}: {e}).")
+        print("PERINGATAN: audio tidak akan dapat diputar ulang dari histori.")
+        return None
 
 
 def validate_audio(audio_path):
@@ -197,17 +253,25 @@ def preprocess_audio(audio_path):
 # ==============================
 # CORE PROCESSING PIPELINE
 # ==============================
-def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
-                 request: gr.Request = None):
+def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, model_name="medium",
+                 request: gr.Request = None, progress=gr.Progress(track_tqdm=True)):
     if not audio_file:
         pesan = "Tidak ada file audio."
         return pesan, pesan, pesan, pesan
 
     num_speakers = min(int(num_speakers_val), MAX_SPEAKERS)
-    print("Mulai pipeline ASR dan Diarization...")
+    print(f"Mulai pipeline ASR (Model: {model_name}) dan Diarization...")
+
+    # Lama proses dihitung dari titik ini, mencakup seluruh tahap (validasi,
+    # pra-pemrosesan audio, transkripsi, diarisasi, koreksi, penilaian).
+    # Angka ini dilaporkan di histori sebagai indikator kelayakan pakai
+    # sistem: transkripsi yang lebih lama daripada mendengarkan rekamannya
+    # sendiri adalah temuan yang harus terlihat, bukan tersamar.
+    mulai_proses = time.perf_counter()
 
     # Validasi Audio: berkas yang tidak layak dihentikan di sini agar tidak
     # menimbulkan kesalahan pada tahap pemrosesan berikutnya.
+    progress(0.05, desc="Memvalidasi berkas audio...")
     try:
         durasi_audio = validate_audio(audio_file)
     except AudioValidationError as e:
@@ -216,13 +280,21 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
         return pesan, pesan, pesan, pesan
 
     # Pra-pemrosesan Audio
+    progress(0.15, desc="Pra-pemrosesan audio (noise reduction & normalisasi)...")
     processed_audio = preprocess_audio(audio_file)
 
     dialogue = ""
+    # Tiga versi teks disimpan terpisah agar jejak pemrosesan dapat ditelusuri:
+    # mentah Whisper (full_text), hasil pembersihan aturan (teks_aturan), dan
+    # hasil koreksi salah dengar oleh LLM (teks_llm).
+    teks_aturan = ""
+    teks_llm = None
     try:
         # 1. Transkripsi Whisper
-        print("Mulai transkripsi Whisper...")
-        result = whisper_model.transcribe(
+        selected_model = get_whisper_model(model_name)
+        progress(0.25, desc=f"Mengonversi suara ke teks dengan Whisper ASR ({model_name})...")
+        print(f"Mulai transkripsi Whisper dengan model '{model_name}'...")
+        result = selected_model.transcribe(
             processed_audio,
             verbose=False,
             language=BAHASA,
@@ -234,6 +306,7 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
         print("Transkripsi Whisper selesai.")
 
         # 2. Diarisasi Pyannote
+        progress(0.60, desc="Mengidentifikasi pembicara (Pyannote Diarization)...")
         print("Mulai diarization Pyannote...")
         diarization_result = pyannote_diarization(processed_audio, num_speakers)
         cleaned_diarization = Annotation(uri=diarization_result.uri)
@@ -272,6 +345,7 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
         print("Pipeline diarization selesai.")
 
         # 3. Pra-pemrosesan Teks (tahap [9])
+        progress(0.85, desc="Pra-pemrosesan teks & pemetaan dialog...")
         print("Mulai pra-pemrosesan teks...")
         pembicara_ada = daftar_pembicara(segmen_terstruktur)
         target = f"Pembicara {int(pembicara_dinilai)}" if int(pembicara_dinilai) > 0 else None
@@ -284,13 +358,42 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
                 f"Pilih nomor pembicara yang sesuai, atau isi 0 untuk menilai seluruh pembicara."
             )
         else:
-            teks_siswa = susun_teks_pembicara(segmen_terstruktur, target)
+            teks_aturan = susun_teks_pembicara(segmen_terstruktur, target)
             label = target or "seluruh pembicara"
+
+            # Koreksi salah dengar ASR oleh LLM. Teks sebelum koreksi tetap
+            # ditampilkan berdampingan: koreksi yang tidak terlihat tidak dapat
+            # diaudit guru, dan justru menyamarkan kesalahan transkripsi.
+            progress(0.88, desc="Mengoreksi salah dengar ASR dengan LLM...")
+            print("Mulai koreksi salah dengar ASR...")
+
+            def lapor_koreksi(i, n):
+                # Tahap ini puluhan detik per potongan; tanpa kemajuan yang
+                # terlihat, aplikasi tampak menggantung.
+                progress(0.88 + 0.06 * (i - 1) / max(n, 1),
+                         desc=f"Mengoreksi salah dengar ASR ({i}/{n})...")
+                print(f"   - potongan {i}/{n}...")
+
+            koreksi = koreksi_asr_llm(teks_aturan, topik, lapor=lapor_koreksi)
+            teks_siswa = koreksi["teks"]
+            if koreksi["diterapkan"]:
+                teks_llm = teks_siswa
+            print(f"Koreksi ASR: {koreksi['catatan']}")
+
+            daftar_ubah = "\n".join(
+                f"  - {a} → {b}" for a, b in koreksi["perubahan"]
+            ) or "  (tidak ada kata yang dilaporkan berubah)"
+
             nlp_result = (
-                f"=== TEKS HASIL PRA-PEMROSESAN ({label}) ===\n\n{teks_siswa}\n\n"
+                f"=== TEKS SEBELUM KOREKSI ({label}) ===\n\n{teks_aturan}\n\n"
+                f"=== TEKS SETELAH KOREKSI LLM ===\n\n"
+                f"{teks_siswa if koreksi['diterapkan'] else '(koreksi tidak diterapkan)'}\n\n"
+                f"=== KATA YANG DIKOREKSI ===\n{daftar_ubah}\n\n"
                 f"=== INFORMASI ===\n"
+                f"Status koreksi: {koreksi['catatan']}\n"
                 f"Pembicara terdeteksi: {', '.join(pembicara_ada) or '(tidak ada)'}\n"
-                f"Teks di atas inilah yang dinilai oleh sistem."
+                f"Yang dinilai sistem: teks "
+                f"{'SETELAH' if koreksi['diterapkan'] else 'SEBELUM'} koreksi."
             )
         print(f"Pra-pemrosesan teks selesai. Target: {target or 'semua pembicara'}")
 
@@ -313,6 +416,7 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
             )
         else:
             try:
+                progress(0.92, desc="Menilai jawaban lisan dengan LLM...")
                 print("Mulai evaluasi LLM...")
                 # Yang dinilai adalah teks hasil pra-pemrosesan milik pembicara
                 # yang dievaluasi, bukan transkrip mentah seluruh pembicara.
@@ -327,6 +431,7 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
         # Kegagalan penyimpanan tidak boleh membuang hasil yang sudah dihitung:
         # guru tetap melihat transkrip dan skor, disertai pemberitahuan bahwa
         # hasil tersebut tidak terdokumentasi.
+        progress(0.97, desc="Menyimpan hasil ke basis data histori...")
         id_user = id_user_dari_token(request.cookies.get("session-id")) if request else None
         if id_user is None:
             eval_result += (
@@ -342,10 +447,16 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
                     durasi=durasi_audio,
                     segmen=segmen_terstruktur,
                     full_text=full_text,
-                    corrected_text=teks_siswa,
+                    corrected_text=teks_aturan,
+                    llm_text=teks_llm,
                     topik=topik or None,
                     hasil_evaluasi=hasil,
                     pembicara_dinilai=target,
+                    # Rekaman disalin hanya bila hasilnya benar-benar akan
+                    # tersimpan; menyalin lebih awal akan meninggalkan berkas
+                    # yatim di disk setiap kali sesi login tidak terdeteksi.
+                    filepath=simpan_rekaman(audio_file),
+                    waktu_proses=round(time.perf_counter() - mulai_proses, 1),
                 )
                 print(f"Hasil tersimpan ke basis data (id_audio={id_audio}).")
                 eval_result += f"\n\n✅ Hasil tersimpan ke histori (ID: {id_audio})."
@@ -356,6 +467,7 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1,
                     f"({type(e).__name__}). Transkrip dan skor di atas tetap sahih."
                 )
 
+        progress(1.0, desc="Proses transkripsi & analisis selesai!")
         print("Semua proses selesai.")
 
     finally:
@@ -419,6 +531,12 @@ def create_unified_app():
                     type="filepath",
                     format="wav",
                 )
+                model_input = gr.Dropdown(
+                    choices=["tiny", "base", "small", "medium", "large"],
+                    value=WHISPER_MODEL if WHISPER_MODEL in ["tiny", "base", "small", "medium", "large"] else "medium",
+                    label="Model Whisper ASR",
+                    info="Pilih model Whisper yang digunakan untuk transkripsi."
+                )
                 topik_input = gr.Textbox(
                     lines=3,
                     label="Topik / Pertanyaan",
@@ -431,22 +549,43 @@ def create_unified_app():
                     label="Pembicara yang Dinilai",
                     info="Nomor pembicara yang merupakan siswa. Isi 0 untuk menilai seluruh pembicara."
                 )
-                submit_btn = gr.Button(" Proses Audio", variant="primary")
+                submit_btn = gr.Button("🚀 Proses Audio", variant="primary")
 
             with gr.Column(scale=2):
-                with gr.Tabs():
-                    with gr.TabItem("Penilaian"):
-                        eval_out = gr.Textbox(lines=15, label="Skor & Umpan Balik (Rubrik)")
-                    with gr.TabItem("Dialog"):
-                        dialogue_out = gr.Textbox(lines=15, label="Dialog Berdasarkan Pembicara")
-                    with gr.TabItem("Transkrip Penuh"):
-                        full_text_out = gr.Textbox(lines=15, label="Hasil Transkrip Lengkap")
-                    with gr.TabItem("Pra-pemrosesan Teks"):
-                        nlp_out = gr.Textbox(lines=15, label="Teks Bersih yang Dinilai Sistem")
+                tampilan_dropdown = gr.Dropdown(
+                    choices=[
+                        "Penilaian & Rubrik",
+                        "Dialog Berdasarkan Pembicara",
+                        "Transkrip Penuh",
+                        "Teks Pra-pemrosesan"
+                    ],
+                    value="Penilaian & Rubrik",
+                    label="Pilih Tampilan Hasil Transkrip",
+                    info="Pilih jenis hasil analisis yang ingin ditampilkan."
+                )
+
+                eval_out = gr.Textbox(lines=16, label="Skor & Umpan Balik (Rubrik)", visible=True)
+                dialogue_out = gr.Textbox(lines=16, label="Dialog Berdasarkan Pembicara", visible=False)
+                full_text_out = gr.Textbox(lines=16, label="Hasil Transkrip Lengkap", visible=False)
+                nlp_out = gr.Textbox(lines=16, label="Teks Bersih yang Dinilai Sistem", visible=False)
+
+        def ganti_tampilan_hasil(pilihan):
+            return (
+                gr.update(visible=(pilihan == "Penilaian & Rubrik")),
+                gr.update(visible=(pilihan == "Dialog Berdasarkan Pembicara")),
+                gr.update(visible=(pilihan == "Transkrip Penuh")),
+                gr.update(visible=(pilihan == "Teks Pra-pemrosesan")),
+            )
+
+        tampilan_dropdown.change(
+            fn=ganti_tampilan_hasil,
+            inputs=[tampilan_dropdown],
+            outputs=[eval_out, dialogue_out, full_text_out, nlp_out]
+        )
 
         submit_btn.click(
             fn=asr_pipeline,
-            inputs=[audio_input, num_speakers_input, topik_input, pembicara_input],
+            inputs=[audio_input, num_speakers_input, topik_input, pembicara_input, model_input],
             outputs=[dialogue_out, full_text_out, nlp_out, eval_out]
         )
     return demo

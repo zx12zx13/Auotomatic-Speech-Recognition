@@ -21,6 +21,7 @@
                     <th>Waktu Unggah</th>
                     <th>Nama Berkas</th>
                     <th>Durasi</th>
+                    <th>Lama Proses</th>
                     <th>Status</th>
                     <th>Skor Akhir</th>
                     <th>Aksi</th>
@@ -32,6 +33,10 @@
                     <td>{{ h["uploaded_at"] | ganti_t }}</td>
                     <td>{{ h["filename"] }}</td>
                     <td>{{ h["duration"] | durasi }}</td>
+                    {# Proses lama tersimpan sebelum lama proses dicatat, jadi
+                       nilainya kosong. Ditampilkan sebagai "-" apa adanya,
+                       bukan diisi angka karangan. #}
+                    <td>{{ h["processing_time"] | durasi }}</td>
                     <td>
                         {% if h["status"] == "selesai" %}
                         <span class="badge badge-selesai">Selesai</span>
@@ -46,7 +51,18 @@
                         <span class="skor-kosong">tidak dinilai</span>
                         {% endif %}
                     </td>
-                    <td><a href="/histori-content/{{ h['id_audio'] }}">Lihat detail</a></td>
+                    <td>
+                        <div class="aksi">
+                            <a class="tombol" href="/histori-content/{{ h['id_audio'] }}">Detail</a>
+                            {# Konfirmasi wajib: penghapusan ikut membuang
+                               transkrip, skor, dan rekaman suaranya, dan tidak
+                               dapat dibatalkan. #}
+                            <form method="post" action="/histori-content/{{ h['id_audio'] }}/hapus"
+                                  onsubmit="return confirm('Hapus riwayat &quot;{{ h['filename'] }}&quot;?\n\nTranskrip, skor, dan rekaman suaranya ikut terhapus permanen.');">
+                                <button class="tombol tombol-bahaya" type="submit">Hapus</button>
+                            </form>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

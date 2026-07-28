@@ -23,9 +23,9 @@ import statistics
 import sys
 import time
 
-from evaluator import evaluate_response, EvaluationError, GEMINI_MODEL, RUBRIK
+from evaluator import evaluate_response, EvaluationError, LLM_MODEL, RUBRIK
 
-JEDA_DETIK = 4  # menahan laju agar tidak menabrak kuota tier gratis
+JEDA_DETIK = 4  # menahan laju agar tidak menabrak batas laju penyedia
 
 TOPIK = "Jelaskan proses fotosintesis pada tumbuhan."
 
@@ -63,7 +63,7 @@ def _panggil(topik, jawaban, urutan):
 
 def ulangi(n=5):
     """Menilai jawaban yang sama n kali dan melaporkan variasinya."""
-    print(f"Model     : {GEMINI_MODEL}")
+    print(f"Model     : {LLM_MODEL}")
     print(f"Pengujian : jawaban SAMA dinilai {n} kali (temperature=0.0)")
     print(f"Jawaban   : {JAWABAN_UJI[:60]}...\n")
 
@@ -104,8 +104,8 @@ def ulangi(n=5):
         print("\nHASIL: skor IDENTIK pada seluruh pemanggilan.")
         print("Catatan: ini bukti untuk n kecil pada SATU jawaban. Konsistensi")
         print("penuh perlu diuji pada beberapa jawaban dengan mutu beragam,")
-        print("dan sebaiknya diulang pada hari berbeda (model dapat diperbarui")
-        print("Google tanpa pemberitahuan).")
+        print("dan sebaiknya diulang pada hari berbeda (penyedia endpoint dapat")
+        print("mengganti model di belakang nama yang sama tanpa pemberitahuan).")
     else:
         print("\nHASIL: skor BERVARIASI meski temperature=0.0.")
         print("Ini temuan penting dan harus dilaporkan apa adanya di BAB IV,")
@@ -115,7 +115,7 @@ def ulangi(n=5):
 
 def bedakan():
     """Menilai empat jawaban bermutu berbeda untuk menguji daya beda."""
-    print(f"Model     : {GEMINI_MODEL}")
+    print(f"Model     : {LLM_MODEL}")
     print("Pengujian : 4 jawaban bermutu BERBEDA, dinilai sekali masing-masing\n")
 
     hasil = []

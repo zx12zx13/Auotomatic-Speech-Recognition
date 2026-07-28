@@ -36,13 +36,14 @@ CREATE TABLE IF NOT EXISTS user (
 );
 
 CREATE TABLE IF NOT EXISTS audio (
-    id_audio    INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_user     INTEGER NOT NULL,
-    filename    TEXT NOT NULL,
-    filepath    TEXT,
-    duration    REAL,
-    uploaded_at TEXT NOT NULL,
-    status      TEXT NOT NULL DEFAULT 'diproses',
+    id_audio        INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_user         INTEGER NOT NULL,
+    filename        TEXT NOT NULL,
+    filepath        TEXT,
+    duration        REAL,
+    processing_time REAL,
+    uploaded_at     TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'diproses',
     FOREIGN KEY (id_user) REFERENCES user(id_user)
 );
 
@@ -59,6 +60,9 @@ CREATE TABLE IF NOT EXISTS transcript (
     id_audio       INTEGER NOT NULL,
     full_text      TEXT,
     corrected_text TEXT,
+    llm_text       TEXT,
+    edited_text    TEXT,
+    edited_at      TEXT,
     created_at     TEXT NOT NULL,
     FOREIGN KEY (id_audio) REFERENCES audio(id_audio)
 );
@@ -106,10 +110,41 @@ def get_conn():
     return conn
 
 
+# Kolom yang ditambahkan setelah basis data penelitian mulai terisi. CREATE
+# TABLE IF NOT EXISTS tidak mengubah tabel yang sudah ada, sehingga kolom baru
+# harus ditambahkan terpisah agar basis data lama ikut terbarui tanpa
+# kehilangan data yang sudah terkumpul.
+KOLOM_TAMBAHAN = [
+    ("transcript", "llm_text", "TEXT"),
+    # Lama pemrosesan satu rekaman (detik). Berbeda dari `duration` yang
+    # merupakan panjang rekamannya sendiri: yang satu sifat berkasnya, yang
+    # lain biaya komputasi sistem. Keduanya perlu terpisah karena laporan
+    # penelitian menyebut waktu proses sebagai indikator kelayakan pakai.
+    ("audio", "processing_time", "REAL"),
+    # Suntingan manual guru atas transkrip. Ditaruh di kolom SENDIRI, tidak
+    # menimpa corrected_text/llm_text: bila keluaran sistem ditimpa hasil
+    # suntingan, tidak ada lagi cara membuktikan apa yang sebenarnya
+    # dihasilkan sistem, dan seluruh pengukuran akurasi ASR kehilangan
+    # rujukan.
+    ("transcript", "edited_text", "TEXT"),
+    ("transcript", "edited_at", "TEXT"),
+]
+
+
+def _migrasi(conn):
+    """Menambahkan kolom baru pada basis data yang dibuat versi sebelumnya."""
+    for tabel, kolom, tipe in KOLOM_TAMBAHAN:
+        ada = {r["name"] for r in conn.execute(f"PRAGMA table_info({tabel})")}
+        if kolom not in ada:
+            conn.execute(f"ALTER TABLE {tabel} ADD COLUMN {kolom} {tipe}")
+            print(f"Migrasi: kolom {tabel}.{kolom} ditambahkan.")
+
+
 def init_db():
-    """Membuat seluruh tabel bila belum ada."""
+    """Membuat seluruh tabel bila belum ada, lalu menjalankan migrasi kolom."""
     with get_conn() as conn:
         conn.executescript(SKEMA)
+        _migrasi(conn)
     print(f"Basis data siap: {DB_PATH}")
 
 
@@ -176,7 +211,7 @@ def ambil_user(id_user):
 # ==============================
 def simpan_hasil(id_user, filename, durasi, segmen, full_text, corrected_text,
                  topik=None, hasil_evaluasi=None, pembicara_dinilai=None,
-                 filepath=None):
+                 filepath=None, llm_text=None, waktu_proses=None):
     """Menyimpan satu proses evaluasi secara bertahap dalam satu transaksi.
 
     Urutan penyimpanan mengikuti alur proposal: audio -> speaker -> transcript
@@ -185,9 +220,20 @@ def simpan_hasil(id_user, filename, durasi, segmen, full_text, corrected_text,
 
     Argumen:
         segmen: daftar dict berisi 'pembicara', 'mulai', 'selesai', 'teks'.
+        full_text: transkrip mentah Whisper, seluruh pembicara.
+        corrected_text: teks pembicara yang dinilai setelah pembersihan
+            berbasis aturan.
+        llm_text: teks setelah koreksi salah dengar oleh LLM, atau None bila
+            koreksi tidak dilakukan/ditolak. Disimpan terpisah dari
+            corrected_text agar perubahan yang dibuat LLM dapat ditelusuri;
+            tanpa itu, koreksi tidak dapat dipertanggungjawabkan.
         hasil_evaluasi: dict keluaran evaluator.evaluate_response, atau None
             bila evaluasi tidak dilakukan/gagal.
         pembicara_dinilai: label pembicara yang dinilai, mis. "Pembicara 1".
+        filepath: lokasi salinan rekaman yang disimpan sistem, agar guru dapat
+            memutar ulang audionya dari histori dan mencocokkannya dengan
+            transkrip. None bila rekaman tidak disalin.
+        waktu_proses: lama pemrosesan satu rekaman dalam detik.
 
     Mengembalikan id_audio.
     """
@@ -195,9 +241,10 @@ def simpan_hasil(id_user, filename, durasi, segmen, full_text, corrected_text,
     with get_conn() as conn:
         # 1. audio
         cur = conn.execute(
-            "INSERT INTO audio (id_user, filename, filepath, duration, uploaded_at, status)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (id_user, filename, filepath, durasi, _sekarang(), "selesai"),
+            "INSERT INTO audio (id_user, filename, filepath, duration,"
+            " processing_time, uploaded_at, status)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (id_user, filename, filepath, durasi, waktu_proses, _sekarang(), "selesai"),
         )
         id_audio = cur.lastrowid
 
@@ -221,9 +268,9 @@ def simpan_hasil(id_user, filename, durasi, segmen, full_text, corrected_text,
 
         # 3. transcript
         cur = conn.execute(
-            "INSERT INTO transcript (id_audio, full_text, corrected_text, created_at)"
-            " VALUES (?, ?, ?, ?)",
-            (id_audio, full_text, corrected_text, _sekarang()),
+            "INSERT INTO transcript (id_audio, full_text, corrected_text, llm_text, created_at)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (id_audio, full_text, corrected_text, llm_text, _sekarang()),
         )
         id_transcript = cur.lastrowid
 
@@ -296,7 +343,8 @@ def ambil_histori(id_user):
     with get_conn() as conn:
         return conn.execute(
             """
-            SELECT a.id_audio, a.filename, a.duration, a.uploaded_at, a.status,
+            SELECT a.id_audio, a.filename, a.duration, a.processing_time,
+                   a.filepath, a.uploaded_at, a.status,
                    s.score, s.created_at AS waktu_nilai
             FROM audio a
             LEFT JOIN assessment s ON s.id_audio = a.id_audio
@@ -361,6 +409,100 @@ def ambil_detail_audio(id_audio, id_user):
         "segmen": segmen,
         "penilaian": penilaian,
     }
+
+
+# ==============================
+# SUNTING & HAPUS HISTORI
+# ==============================
+# Seluruh fungsi di bawah menyaring id_user pada klausa WHERE, bukan hanya
+# memeriksanya di lapisan rute. Dengan begitu, satu rute yang lupa memeriksa
+# kepemilikan tidak berubah menjadi celah yang memungkinkan seorang guru
+# menyunting atau menghapus data guru lain.
+
+def perbarui_transkrip(id_audio, id_user, teks):
+    """Menyimpan suntingan manual guru atas transkrip.
+
+    Keluaran asli sistem (`corrected_text` dan `llm_text`) TIDAK ditimpa.
+    Suntingan masuk ke kolom terpisah supaya perbandingan "apa yang ditulis
+    sistem" versus "apa yang dibetulkan guru" tetap dapat dilakukan; justru
+    selisih itulah yang menjadi bukti seberapa akurat sistem bekerja.
+
+    Mengirim teks kosong berarti membatalkan suntingan dan kembali memakai
+    keluaran sistem.
+
+    Mengembalikan True bila ada baris yang berubah, False bila proses tidak
+    ditemukan atau bukan milik pengguna ini.
+    """
+    teks = (teks or "").strip()
+    with get_conn() as conn:
+        milik = conn.execute(
+            "SELECT 1 FROM audio WHERE id_audio = ? AND id_user = ?",
+            (id_audio, id_user),
+        ).fetchone()
+        if not milik:
+            return False
+        cur = conn.execute(
+            "UPDATE transcript SET edited_text = ?, edited_at = ? WHERE id_audio = ?",
+            (teks or None, _sekarang() if teks else None, id_audio),
+        )
+        return cur.rowcount > 0
+
+
+def perbarui_topik(id_audio, id_user, topik):
+    """Memperbarui topik/pertanyaan pada penilaian sebuah proses.
+
+    Mengembalikan True bila ada baris yang berubah. False bila proses itu
+    memang tidak punya baris penilaian (topik tidak diisi saat pemrosesan,
+    atau evaluasi gagal), sehingga tidak ada yang dapat disunting.
+    """
+    topik = (topik or "").strip()
+    with get_conn() as conn:
+        milik = conn.execute(
+            "SELECT 1 FROM audio WHERE id_audio = ? AND id_user = ?",
+            (id_audio, id_user),
+        ).fetchone()
+        if not milik:
+            return False
+        cur = conn.execute(
+            "UPDATE assessment SET topik = ? WHERE id_audio = ? AND id_user = ?",
+            (topik or None, id_audio, id_user),
+        )
+        return cur.rowcount > 0
+
+
+def hapus_histori(id_audio, id_user):
+    """Menghapus satu proses beserta seluruh data turunannya.
+
+    Penghapusan dilakukan dari anak ke induk (assessment, segment, transcript,
+    speaker, lalu audio) karena foreign key diaktifkan; urutan terbalik akan
+    ditolak SQLite. Seluruhnya dalam satu transaksi agar tidak menyisakan
+    segmen atau penilaian yatim bila terjadi kegagalan di tengah.
+
+    Mengembalikan lokasi berkas rekaman yang perlu ikut dihapus pemanggil
+    (atau None), atau False bila proses tidak ditemukan/bukan milik pengguna
+    ini. Berkasnya sengaja TIDAK dihapus di sini: basis data dan sistem berkas
+    tidak berbagi transaksi, sehingga berkas dihapus hanya setelah transaksi
+    basis data benar-benar berhasil.
+    """
+    with get_conn() as conn:
+        baris = conn.execute(
+            "SELECT filepath FROM audio WHERE id_audio = ? AND id_user = ?",
+            (id_audio, id_user),
+        ).fetchone()
+        if not baris:
+            return False
+
+        conn.execute("DELETE FROM assessment WHERE id_audio = ?", (id_audio,))
+        conn.execute(
+            "DELETE FROM segment WHERE id_transcript IN"
+            " (SELECT id_transcript FROM transcript WHERE id_audio = ?)",
+            (id_audio,),
+        )
+        conn.execute("DELETE FROM transcript WHERE id_audio = ?", (id_audio,))
+        conn.execute("DELETE FROM speaker WHERE id_audio = ?", (id_audio,))
+        conn.execute("DELETE FROM audio WHERE id_audio = ?", (id_audio,))
+
+    return baris["filepath"]
 
 
 if __name__ == "__main__":

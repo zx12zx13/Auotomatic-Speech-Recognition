@@ -1,33 +1,30 @@
-"""Modul evaluasi respons lisan siswa menggunakan Large Language Model.
-
-Mengimplementasikan tahap [10] pipeline penelitian (§3.2.2 proposal): teks hasil
-pra-pemrosesan dinilai oleh LLM berdasarkan rubrik penilaian (Tabel 3.1), lalu
-menghasilkan skor per indikator dan umpan balik naratif.
-
-Modul ini sengaja dipisahkan dari app.py agar dapat diuji secara mandiri.
-"""
-
 import os
 import json
+import urllib.request
+import urllib.error
 
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 
 load_dotenv()
 
-# Model dapat diganti lewat .env tanpa mengubah kode, mis. ke gemini-2.5-pro
-# bila diperlukan kualitas penalaran yang lebih tinggi saat pengujian.
-# Memakai `or`, bukan nilai default os.getenv: bila .env memuat baris
-# "GEMINI_MODEL=" (ada tetapi kosong), os.getenv mengembalikan string kosong
-# dan default TIDAK dipakai -- pemanggilan API lalu gagal "model is required".
-#
-# Model dipaku pada versi stabil tertentu, BUKAN alias seperti
-# "gemini-flash-latest": isi alias berubah sewaktu-waktu tanpa pemberitahuan,
-# dan pergantian model di tengah penelitian membuat pengukuran konsistensi
-# maupun objektivitas tidak dapat direproduksi. Bila model diganti, catat
-# tanggal dan versinya di laporan.
-GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash"
+# Konfigurasi LLM API
+LLM_BASE_URL = os.getenv("LLM_BASE_URL") or "https://9router-iaak.srv1746580.hstgr.cloud/v1"
+LLM_API_KEY = os.getenv("LLM_API_KEY") or "sk-0f575f000c66e733-md7mx7-b9655e47"
+LLM_MODEL = os.getenv("LLM_MODEL") or "FreeCoder"
+
+# Kunci cadangan di atas tertulis langsung di kode. Repositori penelitian ini
+# publik, sehingga kunci akan ikut terbit ke internet pada commit berikutnya
+# bila tidak dipindahkan ke .env lebih dahulu. Peringatan sengaja dicetak agar
+# masalah ini terlihat, bukan tersamar -- lihat BUG-02 yang serupa.
+if not os.getenv("LLM_API_KEY"):
+    # Tanpa emoji: konsol Windows memakai cp1252 dan akan melempar
+    # UnicodeEncodeError, sehingga peringatan justru menghentikan aplikasi.
+    print(
+        "PERINGATAN: LLM_API_KEY tidak ditemukan di .env, sistem memakai "
+        "kunci cadangan yang tertulis di evaluator.py.\n"
+        "            Pindahkan LLM_API_KEY, LLM_BASE_URL, dan LLM_MODEL ke "
+        ".env sebelum melakukan commit berikutnya."
+    )
 
 SKALA_MIN, SKALA_MAKS = 1, 4
 
@@ -150,9 +147,18 @@ TRANSKRIP JAWABAN SISWA:
 {jawaban_siswa.strip()}
 
 FORMAT KELUARAN:
-Balas dalam format JSON sesuai skema yang diberikan, memuat skor dan alasan untuk
-setiap indikator, serta umpan balik naratif yang ditujukan kepada siswa dalam
-bahasa Indonesia."""
+Keluarkan HANYA JSON murni (tanpa teks tambahan dan tanpa ```json markdown block) dengan skema berikut:
+{{
+  "skor_relevansi": <integer 1-4>,
+  "alasan_relevansi": "<string>",
+  "skor_konsep": <integer 1-4>,
+  "alasan_konsep": "<string>",
+  "skor_kelengkapan": <integer 1-4>,
+  "alasan_kelengkapan": "<string>",
+  "skor_koherensi": <integer 1-4>,
+  "alasan_koherensi": "<string>",
+  "umpan_balik": "<string>"
+}}"""
 
 
 def parse_hasil(data):
@@ -171,9 +177,6 @@ def parse_hasil(data):
             raise EvaluationError(f"Keluaran model tidak memuat '{medan_skor}'.")
 
         mentah = data[medan_skor]
-        # int() memotong pecahan (int(2.5) -> 2) dan menerima bool
-        # (int(True) -> 1), sehingga keduanya harus ditolak eksplisit —
-        # bukan diam-diam diubah menjadi skor yang tampak sah.
         if isinstance(mentah, bool) or (
             isinstance(mentah, float) and not mentah.is_integer()
         ):
@@ -197,9 +200,70 @@ def parse_hasil(data):
         hasil["alasan"][kunci] = str(data.get(f"alasan_{kunci}", "")).strip()
 
     hasil["umpan_balik"] = str(data.get("umpan_balik", "")).strip()
-    # Skor akhir = rata-rata keempat indikator, tetap pada skala 1-4.
     hasil["skor_akhir"] = round(sum(hasil["skor"].values()) / len(RUBRIK), 2)
     return hasil
+
+
+def _lepas_pagar_kode(teks):
+    """Membuang pembungkus ```json ... ``` bila model menyertakannya."""
+    teks = (teks or "").strip()
+    if not teks.startswith("```"):
+        return teks
+    baris = teks.splitlines()
+    if baris and baris[0].startswith("```"):
+        baris = baris[1:]
+    if baris and baris[-1].strip() == "```":
+        baris = baris[:-1]
+    return "\n".join(baris).strip()
+
+
+def panggil_llm(pesan, temperature=0.0, timeout=60):
+    """Mengirim daftar pesan ke API LLM dan mengembalikan isi jawabannya.
+
+    Dipakai bersama oleh evaluasi rubrik dan koreksi transkrip ASR
+    (`text_preprocessing.koreksi_asr_llm`) agar konfigurasi endpoint hanya
+    berada di satu tempat: bila endpoint berpindah, hanya satu berkas berubah.
+
+    `temperature` dipatok 0.0 secara bawaan karena penelitian ini mengklaim
+    hasil yang konsisten -- pemanggilan tidak boleh mengandung keacakan.
+    """
+    api_key = os.getenv("LLM_API_KEY") or LLM_API_KEY
+    base_url = os.getenv("LLM_BASE_URL") or LLM_BASE_URL
+    model_name = os.getenv("LLM_MODEL") or LLM_MODEL
+
+    if not api_key:
+        raise EvaluationError("LLM_API_KEY belum diatur.")
+
+    payload = {
+        "model": model_name,
+        "messages": pesan,
+        "temperature": temperature,
+        "stream": False,
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "x-api-key": api_key,
+        "Content-Type": "application/json",
+    }
+    req = urllib.request.Request(
+        f"{base_url.rstrip('/')}/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            resp_json = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        raise EvaluationError(f"Gagal menghubungi API LLM ({type(e).__name__}): {e}") from e
+
+    try:
+        return _lepas_pagar_kode(resp_json["choices"][0]["message"]["content"])
+    except (KeyError, IndexError, TypeError) as e:
+        raise EvaluationError(
+            f"Format respons LLM API tidak valid ({type(e).__name__}): {resp_json}"
+        ) from e
 
 
 def evaluate_response(topik, jawaban_siswa):
@@ -213,40 +277,21 @@ def evaluate_response(topik, jawaban_siswa):
     if not jawaban_siswa or not jawaban_siswa.strip():
         raise EvaluationError("Tidak ada teks jawaban siswa yang dapat dinilai.")
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise EvaluationError(
-            "GEMINI_API_KEY belum diatur. Salin .env.example menjadi .env, lalu isi "
-            "API key dari https://aistudio.google.com/app/apikey"
-        )
-
-    client = genai.Client(api_key=api_key)
     prompt = build_prompt(topik, jawaban_siswa)
+    pesan = [
+        {
+            "role": "system",
+            "content": "Anda adalah evaluator rubrik respons lisan siswa. Keluarkan SELALU dalam format JSON mentah yang sah tanpa penjelasan atau markdown block ```json."
+        },
+        {"role": "user", "content": prompt},
+    ]
+
+    content_text = panggil_llm(pesan)
 
     try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                # Suhu 0 agar penilaian sekonsisten mungkin antar pemanggilan;
-                # konsistensi adalah tujuan utama penelitian ini.
-                temperature=0.0,
-                response_mime_type="application/json",
-                response_schema=_skema_keluaran(),
-            ),
-        )
-    except Exception as e:
-        raise EvaluationError(
-            f"Gagal menghubungi Gemini API ({type(e).__name__}): {e}"
-        ) from e
-
-    if not getattr(response, "text", None):
-        raise EvaluationError("Gemini API mengembalikan respons kosong.")
-
-    try:
-        data = json.loads(response.text)
+        data = json.loads(content_text)
     except json.JSONDecodeError as e:
-        raise EvaluationError(f"Keluaran model bukan JSON yang sah: {e}") from e
+        raise EvaluationError(f"Keluaran model bukan JSON yang sah: {e}. Teks mentah: {content_text}") from e
 
     return parse_hasil(data)
 

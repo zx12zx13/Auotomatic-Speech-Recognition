@@ -11,6 +11,11 @@ __pycache__/
 # Berkas audio sementara hasil pra-pemrosesan
 *_processed.wav
 
+# Salinan rekaman siswa yang disimpan agar dapat diputar ulang dari histori.
+# Suara adalah data pribadi responden dan tidak boleh terbit ke repositori
+# publik dalam keadaan apa pun.
+rekaman/
+
 # Basis data - memuat data siswa dan hasil penilaian, tidak boleh di-commit
 *.db
 *.db-journal

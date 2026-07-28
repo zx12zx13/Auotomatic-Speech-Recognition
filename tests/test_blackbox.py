@@ -159,41 +159,55 @@ class UjiUploadAudio(unittest.TestCase):
 class UjiEvaluasiLLM(unittest.TestCase):
     """MODUL 6 — Evaluasi LLM: jalur kegagalan yang dapat diuji tanpa API."""
 
+    # Kedua uji berikut TIDAK BOLEH menyentuh jaringan. Versi lama menguji
+    # klien Gemini yang sudah tidak dipakai, sehingga uji "tanpa API key"
+    # justru lolos ke endpoint sungguhan dan mengirim data uji ke pihak ketiga
+    # selama 30 detik. Sekarang urlopen dan konstanta kunci dipalsukan.
+
     def test_bb020_api_gagal_merespons(self):
         import evaluator
 
-        class KlienGagal:
-            def __init__(self, *a, **k):
-                self.models = self
+        def urlopen_gagal(*a, **k):
+            raise ConnectionError("simulasi koneksi terputus")
 
-            def generate_content(self, *a, **k):
-                raise ConnectionError("simulasi koneksi terputus")
-
-        klien_asli = evaluator.genai.Client
-        kunci_asli = os.environ.pop("GEMINI_API_KEY", None)
-        os.environ["GEMINI_API_KEY"] = "kunci-tiruan"
-        evaluator.genai.Client = KlienGagal
+        asli = evaluator.urllib.request.urlopen
+        evaluator.urllib.request.urlopen = urlopen_gagal
+        os.environ["LLM_API_KEY"] = "kunci-tiruan"
         try:
             with self.assertRaises(evaluator.EvaluationError) as ctx:
                 evaluator.evaluate_response("Topik", "Jawaban siswa.")
-            self.assertIn("Gagal menghubungi Gemini API", str(ctx.exception))
+            self.assertIn("Gagal menghubungi API LLM", str(ctx.exception))
         finally:
-            evaluator.genai.Client = klien_asli
-            if kunci_asli is None:
-                os.environ.pop("GEMINI_API_KEY", None)
-            else:
-                os.environ["GEMINI_API_KEY"] = kunci_asli
+            evaluator.urllib.request.urlopen = asli
+            os.environ.pop("LLM_API_KEY", None)
 
     def test_bb020b_tanpa_api_key_pesan_jelas(self):
         import evaluator
-        kunci_asli = os.environ.pop("GEMINI_API_KEY", None)
+        os.environ.pop("LLM_API_KEY", None)
+        # Konstanta cadangan ikut dikosongkan: selama kunci masih tertulis di
+        # evaluator.py, kondisi "kunci tidak ada" mustahil terjadi dan uji ini
+        # hanya akan lolos secara semu.
+        cadangan = evaluator.LLM_API_KEY
+        evaluator.LLM_API_KEY = ""
         try:
             with self.assertRaises(evaluator.EvaluationError) as ctx:
                 evaluator.evaluate_response("Topik", "Jawaban siswa.")
-            self.assertIn("GEMINI_API_KEY", str(ctx.exception))
+            self.assertIn("LLM_API_KEY", str(ctx.exception))
         finally:
-            if kunci_asli is not None:
-                os.environ["GEMINI_API_KEY"] = kunci_asli
+            evaluator.LLM_API_KEY = cadangan
+
+    def test_bb020c_respons_bukan_json_ditolak(self):
+        """Keluaran model yang bukan JSON harus gagal terlihat, bukan diam."""
+        import evaluator
+
+        asli = evaluator.panggil_llm
+        evaluator.panggil_llm = lambda *a, **k: "Maaf, saya tidak bisa menilai."
+        try:
+            with self.assertRaises(evaluator.EvaluationError) as ctx:
+                evaluator.evaluate_response("Topik", "Jawaban siswa.")
+            self.assertIn("bukan JSON", str(ctx.exception))
+        finally:
+            evaluator.panggil_llm = asli
 
 
 class UjiSimpanDanDashboard(unittest.TestCase):

@@ -27,18 +27,64 @@
             color: var(--redup);
             font-family: var(--f-mono);
             font-size: 0.78rem;
-            margin: 0 0 1.8rem;
+            margin: 0 0 1.4rem;
+        }
+        .transkrip-sunting {
+            border-left-color: var(--amber);
+            background: var(--amber-muda);
+        }
+        .catatan {
+            font-size: 0.85rem;
+            line-height: 1.55;
+            color: var(--redup);
+            background: var(--amber-muda);
+            border-left: 3px solid var(--amber);
+            border-radius: 0 8px 8px 0;
+            padding: 0.7rem 0.9rem;
+            margin: 0 0 1rem;
+        }
+        .baris-atas {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.2rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <a class="kembali" href="/histori-content">&larr; Kembali ke Histori</a>
+        <div class="baris-atas">
+            <a class="kembali" style="margin:0" href="/histori-content">&larr; Kembali ke Histori</a>
+            <form method="post" action="/histori-content/{{ detail.audio['id_audio'] }}/hapus"
+                  onsubmit="return confirm('Hapus riwayat ini?\n\nTranskrip, skor, dan rekaman suaranya ikut terhapus permanen.');">
+                <button class="tombol tombol-bahaya" type="submit">Hapus riwayat ini</button>
+            </form>
+        </div>
+
         <h1>{{ detail.audio["filename"] }}</h1>
         <p class="meta">
             Diunggah {{ detail.audio["uploaded_at"] | ganti_t }}
-            &middot; Durasi {{ detail.audio["duration"] | durasi }}
+            &middot; Durasi rekaman {{ detail.audio["duration"] | durasi }}
+            &middot; Lama proses {{ detail.audio["processing_time"] | durasi }}
         </p>
+
+        <div class="blok">
+            <h2>Rekaman</h2>
+            {% if detail.audio["filepath"] %}
+            <p class="indikator">Putar ulang untuk mencocokkan transkrip dengan suara aslinya.</p>
+            <audio controls preload="none" src="/histori/audio/{{ detail.audio['id_audio'] }}">
+                Peramban Anda tidak dapat memutar audio.
+                <a href="/histori/audio/{{ detail.audio['id_audio'] }}">Unduh berkasnya</a>.
+            </audio>
+            {% else %}
+            {# Proses yang dijalankan sebelum penyimpanan rekaman ditambahkan
+               tidak punya salinan audio. Dikatakan terus terang, bukan
+               ditampilkan sebagai pemutar kosong yang membingungkan. #}
+            <p class="skor-kosong">Rekaman tidak tersimpan untuk proses ini,
+               sehingga tidak dapat diputar ulang.</p>
+            {% endif %}
+        </div>
 
         {% if detail.penilaian %}
         <div class="blok">
@@ -67,12 +113,68 @@
         </div>
         {% endif %}
 
-        {% if detail.transkrip and detail.transkrip["corrected_text"] %}
+        {% if detail.transkrip and detail.transkrip["llm_text"] %}
+        {# Kedua versi ditampilkan berdampingan supaya guru dapat memeriksa apa
+           yang diubah LLM. Menyimpan hanya versi akhir membuat koreksi tidak
+           dapat diaudit. #}
+        <div class="blok">
+            <h2>Teks Sebelum Koreksi ASR</h2>
+            <p class="indikator">Hasil pra-pemrosesan berbasis aturan, sebelum kata salah dengar diperbaiki.</p>
+            <div class="transkrip">{{ detail.transkrip["corrected_text"] }}</div>
+        </div>
+        <div class="blok">
+            <h2>Teks yang Dinilai (setelah koreksi LLM)</h2>
+            <p class="indikator">Kata yang salah didengar ASR telah diperbaiki berdasarkan konteks. Inilah teks yang dinilai sistem.</p>
+            <div class="transkrip">{{ detail.transkrip["llm_text"] }}</div>
+        </div>
+        {% elif detail.transkrip and detail.transkrip["corrected_text"] %}
         <div class="blok">
             <h2>Teks yang Dinilai (hasil pra-pemrosesan)</h2>
             <div class="transkrip">{{ detail.transkrip["corrected_text"] }}</div>
         </div>
         {% endif %}
+
+        {% if detail.transkrip and detail.transkrip["edited_text"] %}
+        <div class="blok">
+            <h2>Transkrip Hasil Suntingan Guru</h2>
+            <p class="indikator">Disunting {{ detail.transkrip["edited_at"] | ganti_t }}.
+               Versi keluaran sistem di atas tetap disimpan utuh sebagai pembanding.</p>
+            <div class="transkrip transkrip-sunting">{{ detail.transkrip["edited_text"] }}</div>
+        </div>
+        {% endif %}
+
+        {# Isi awal kotak sunting: suntingan sebelumnya bila ada, kalau tidak
+           teks terbaik yang dihasilkan sistem. Dengan begitu guru membetulkan
+           teks yang sudah ada, bukan mengetik ulang dari nol. #}
+        {% set teks_awal = (detail.transkrip["edited_text"] or detail.transkrip["llm_text"]
+                            or detail.transkrip["corrected_text"] or "") if detail.transkrip else "" %}
+        <div class="blok">
+            <h2>Sunting</h2>
+            <p class="catatan">
+                Suntingan <strong>tidak menimpa keluaran sistem</strong> dan
+                <strong>tidak menjalankan ulang penilaian</strong>. Skor beserta umpan
+                balik di atas tetap milik teks yang dinilai sistem sebelumnya. Skor
+                sengaja tidak dapat disunting: skor adalah keluaran yang sedang diteliti,
+                dan mengubahnya berarti mengubah data penelitian. Skor manual guru
+                untuk uji objektivitas diisi lewat berkas CSV, bukan di halaman ini.
+            </p>
+            <form method="post" action="/histori-content/{{ detail.audio['id_audio'] }}/sunting">
+                <div style="margin-bottom:1rem">
+                    <label class="label-isian" for="topik">Topik / Pertanyaan</label>
+                    <input class="isian" type="text" id="topik" name="topik"
+                           value="{{ detail.penilaian['topik'] if detail.penilaian else '' }}"
+                           {% if not detail.penilaian %}disabled
+                           placeholder="Proses ini tidak punya baris penilaian, topik tidak dapat disunting."{% endif %}>
+                </div>
+                <div style="margin-bottom:1rem">
+                    <label class="label-isian" for="transkrip">Transkrip (betulkan kata yang masih salah)</label>
+                    <textarea class="isian" id="transkrip" name="transkrip" rows="9"
+                        placeholder="Kosongkan lalu simpan untuk membatalkan suntingan dan kembali memakai keluaran sistem."
+                    >{{ teks_awal }}</textarea>
+                </div>
+                <button class="tombol tombol-utama" type="submit">Simpan suntingan</button>
+            </form>
+        </div>
 
         {% if detail.segmen %}
         <div class="blok">

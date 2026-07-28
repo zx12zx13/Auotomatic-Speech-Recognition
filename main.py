@@ -1,8 +1,9 @@
+import os
 import secrets
 
 import gradio as gr
 from fastapi import FastAPI, Request, Form, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -127,6 +128,81 @@ async def history_detail_content(request: Request, id_audio: int, user: User = D
     if detail is None:
         return HTMLResponse("Data tidak ditemukan.", status_code=404)
     return templates.TemplateResponse(request, "histori_detail.html", {"detail": detail})
+
+
+@app.get("/histori/audio/{id_audio}")
+async def histori_audio(id_audio: int, user: User = Depends(get_current_user)):
+    """Menyajikan berkas rekaman agar dapat diputar dari halaman detail.
+
+    Berkasnya TIDAK di-mount sebagai direktori statis: rekaman suara siswa
+    adalah data pribadi, sehingga setiap permintaan harus melewati pemeriksaan
+    login sekaligus pemeriksaan kepemilikan. Dengan StaticFiles, siapa pun yang
+    mengetahui nama berkas dapat mengunduhnya tanpa login.
+    """
+    if not user:
+        return HTMLResponse("Akses ditolak.", status_code=403)
+
+    detail = db.ambil_detail_audio(id_audio, user.id_user)
+    if detail is None:
+        return HTMLResponse("Data tidak ditemukan.", status_code=404)
+
+    lokasi = detail["audio"]["filepath"]
+    # Proses lama tersimpan tanpa salinan rekaman, dan berkas dapat terhapus
+    # dari disk di luar sepengetahuan aplikasi. Keduanya harus dijawab 404 yang
+    # jelas, bukan galat 500 yang menyesatkan.
+    if not lokasi or not os.path.exists(lokasi):
+        return HTMLResponse("Berkas rekaman tidak tersimpan.", status_code=404)
+
+    return FileResponse(lokasi, filename=detail["audio"]["filename"])
+
+
+@app.post("/histori-content/{id_audio}/sunting")
+async def histori_sunting(
+    id_audio: int,
+    topik: str = Form(""),
+    transkrip: str = Form(""),
+    user: User = Depends(get_current_user),
+):
+    """Menyimpan suntingan manual guru atas topik dan transkrip.
+
+    Suntingan transkrip TIDAK menimpa keluaran sistem; lihat
+    `database.perbarui_transkrip`. Skor sengaja tidak dapat disunting: skor
+    adalah keluaran sistem yang sedang diteliti, dan menyuntingnya berarti
+    mengubah data penelitian.
+    """
+    if not user:
+        return HTMLResponse("Akses ditolak.", status_code=403)
+
+    if not db.perbarui_transkrip(id_audio, user.id_user, transkrip):
+        return HTMLResponse("Data tidak ditemukan.", status_code=404)
+    # Nilai balik diabaikan: proses tanpa baris penilaian (topik tidak diisi
+    # atau evaluasi gagal) memang tidak punya topik untuk diperbarui, dan itu
+    # bukan kegagalan.
+    db.perbarui_topik(id_audio, user.id_user, topik)
+
+    return RedirectResponse(url=f"/histori-content/{id_audio}", status_code=303)
+
+
+@app.post("/histori-content/{id_audio}/hapus")
+async def histori_hapus(id_audio: int, user: User = Depends(get_current_user)):
+    """Menghapus satu proses beserta rekaman dan seluruh data turunannya."""
+    if not user:
+        return HTMLResponse("Akses ditolak.", status_code=403)
+
+    lokasi = db.hapus_histori(id_audio, user.id_user)
+    if lokasi is False:
+        return HTMLResponse("Data tidak ditemukan.", status_code=404)
+
+    if lokasi and os.path.exists(lokasi):
+        try:
+            os.remove(lokasi)
+        except OSError as e:
+            # Baris basis datanya sudah hilang, jadi penghapusan tetap
+            # dianggap berhasil. Berkas yang tertinggal dicatat agar dapat
+            # dibersihkan manual, bukan didiamkan.
+            print(f"PERINGATAN: rekaman {lokasi} gagal dihapus ({type(e).__name__}: {e}).")
+
+    return RedirectResponse(url="/histori-content", status_code=303)
 
 
 @app.get("/nilai-content", response_class=HTMLResponse)

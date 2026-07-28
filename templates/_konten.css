@@ -118,6 +118,68 @@ a:hover { text-decoration: underline; }
     line-height: 1.55;
 }
 
+/* ---------- Tombol aksi (sunting / hapus) ---------- */
+.tombol {
+    display: inline-block;
+    font-family: var(--f-body);
+    font-size: 0.83rem;
+    font-weight: 600;
+    padding: 0.42rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid var(--garis-tegas);
+    background: var(--kartu);
+    color: var(--tinta);
+    cursor: pointer;
+    text-decoration: none;
+}
+.tombol:hover { background: var(--pinus-muda); text-decoration: none; }
+
+.tombol-utama {
+    background: var(--pinus);
+    border-color: var(--pinus);
+    color: #fff;
+}
+.tombol-utama:hover { background: var(--pinus-tua); }
+
+/* Warna merah dipakai HANYA untuk aksi yang tidak dapat dibatalkan, supaya
+   guru dapat mengenali penghapusan sebelum menekannya. */
+.tombol-bahaya {
+    background: var(--merah-bg);
+    border-color: var(--merah);
+    color: var(--merah);
+}
+.tombol-bahaya:hover { background: var(--merah); color: #fff; }
+
+.aksi { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.aksi form { display: inline; margin: 0; }
+
+/* ---------- Isian sunting ---------- */
+.isian, textarea.isian {
+    width: 100%;
+    font-family: var(--f-body);
+    font-size: 0.9rem;
+    color: var(--tinta);
+    background: var(--kartu);
+    border: 1px solid var(--garis-tegas);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    line-height: 1.6;
+    resize: vertical;
+}
+.isian:focus { outline: 2px solid var(--pinus); outline-offset: 1px; }
+.label-isian {
+    display: block;
+    font-family: var(--f-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--redup);
+    margin: 0 0 0.35rem;
+}
+
+/* ---------- Pemutar audio ---------- */
+audio { width: 100%; max-width: 34rem; margin-top: 0.3rem; }
+
 .indikator { font-size: 0.85rem; }
 .indikator span {
     display: inline-block;
