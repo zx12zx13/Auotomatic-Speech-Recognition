@@ -40,6 +40,12 @@ pydub
 noisereduce
 soundfile
 
+# Koreksi salah dengar ASR (tahap [9] pra-pemrosesan teks).
+# Double Metaphone dipakai untuk mencari kandidat sebunyi pada istilah serapan
+# Inggris. Jarak Levenshtein-nya ditulis sendiri di koreksi_fonetik.py, bukan
+# memakai pustaka, agar rumusnya dapat dijelaskan pada laporan penelitian.
+metaphone==0.6
+
 # Evaluator LLM
 google-genai==2.12.0
 

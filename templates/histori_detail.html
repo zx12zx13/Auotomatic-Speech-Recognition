@@ -43,6 +43,34 @@
             padding: 0.7rem 0.9rem;
             margin: 0 0 1rem;
         }
+        /* Peringatan salah-nilai sengaja dibuat paling menonjol di halaman:
+           skor yang dihitung dari ucapan orang yang keliru tetap tampak wajar,
+           sehingga hanya peringatan yang mencolok yang dapat mencegahnya
+           terbawa ke laporan penelitian. */
+        .waspada {
+            border-radius: 10px;
+            padding: 0.9rem 1.1rem;
+            margin: 0 0 1.4rem;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        .waspada strong { display: block; margin-bottom: 0.2rem; }
+        .waspada-bahaya {
+            background: var(--merah-bg);
+            border-left: 4px solid var(--merah);
+            color: var(--merah);
+        }
+        .waspada-ingat {
+            background: var(--kuning-proses-bg);
+            border-left: 4px solid var(--kuning-proses);
+            color: var(--kuning-proses);
+        }
+        .waspada-aman {
+            background: var(--hijau-ok-bg);
+            border-left: 4px solid var(--hijau-ok);
+            color: var(--hijau-ok);
+        }
+        .peran-terpilih { font-family: var(--f-mono); font-size: 0.8rem; }
         .baris-atas {
             display: flex;
             justify-content: space-between;
@@ -69,6 +97,41 @@
             &middot; Lama proses {{ detail.audio["processing_time"] | durasi }}
         </p>
 
+        {% set tahap = [
+            ("Validasi & pra-pemrosesan audio", detail.audio["time_audio"]),
+            ("Transkripsi (Whisper)", detail.audio["time_transcribe"]),
+            ("Diarisasi (Pyannote)", detail.audio["time_diarize"]),
+            ("Pra-pemrosesan & koreksi teks", detail.audio["time_text"]),
+            ("Penilaian rubrik (LLM)", detail.audio["time_evaluate"]),
+        ] %}
+        {% if tahap | selectattr(1) | list %}
+        <div class="blok">
+            <h2>Rincian Waktu Proses</h2>
+            <p class="indikator">
+                Dipisah per tahap agar terlihat bagian mana yang sebenarnya lambat.
+                Total {{ detail.audio["processing_time"] | durasi }} untuk rekaman
+                sepanjang {{ detail.audio["duration"] | durasi }}.
+            </p>
+            <table>
+                <thead><tr><th>Tahap</th><th>Lama</th><th>Bagian dari total</th></tr></thead>
+                <tbody>
+                    {% set total = detail.audio["processing_time"] or 0 %}
+                    {% for nama, detik in tahap %}
+                    {% if detik is not none %}
+                    <tr>
+                        <td>{{ nama }}</td>
+                        <td style="white-space:nowrap">{{ "%.1f" | format(detik) }} dtk</td>
+                        <td style="white-space:nowrap">
+                            {% if total > 0 %}{{ "%.0f" | format(detik / total * 100) }}%{% else %}-{% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
         <div class="blok">
             <h2>Rekaman</h2>
             {% if detail.audio["filepath"] %}
@@ -86,13 +149,130 @@
             {% endif %}
         </div>
 
+        {% if pesan_galat %}
+        <div class="waspada waspada-bahaya">{{ pesan_galat }}</div>
+        {% endif %}
+
+        {# Peringatan siapa yang dinilai. Diarisasi hanya mengelompokkan suara,
+           jadi tanpa peran yang ditetapkan guru, tidak ada yang tahu apakah
+           yang dinilai benar-benar siswa. #}
+        {% if detail.penilaian %}
+            {% if not detail.dinilai %}
+            <div class="waspada waspada-bahaya">
+                <strong>Penilaian ini menggabungkan SELURUH pembicara.</strong>
+                Ucapan guru ikut terhitung sebagai jawaban siswa. Karena pertanyaan
+                guru menurut definisinya sudah relevan, tepat konsep, dan runtut,
+                skor di bawah kemungkinan besar lebih tinggi daripada yang
+                seharusnya. Tetapkan peran di bawah, lalu nilai ulang pembicara
+                yang merupakan siswa.
+            </div>
+            {% elif detail.dinilai["role"] == "Guru" %}
+            <div class="waspada waspada-bahaya">
+                <strong>Yang dinilai adalah GURU, bukan siswa.</strong>
+                Skor di bawah dihitung dari ucapan {{ detail.dinilai["speaker_label"] }}
+                yang Anda tandai sebagai Guru, sehingga tidak sah dipakai sebagai
+                nilai siswa. Nilai ulang memakai pembicara yang benar.
+            </div>
+            {% elif not detail.dinilai["role"] %}
+            <div class="waspada waspada-ingat">
+                <strong>Belum dipastikan siapa yang dinilai.</strong>
+                Skor di bawah dihitung dari ucapan {{ detail.dinilai["speaker_label"] }},
+                tetapi nomor itu hanya kelompok suara hasil diarisasi, bukan peran.
+                Putar rekamannya, lalu tetapkan peran tiap pembicara di bawah.
+            </div>
+            {% else %}
+            <div class="waspada waspada-aman">
+                <strong>Yang dinilai: {{ detail.dinilai["speaker_label"] }}
+                ({{ detail.dinilai["role"] }}).</strong>
+                Peran sudah Anda tetapkan, sehingga skor di bawah dapat
+                dipertanggungjawabkan sebagai nilai orang yang benar.
+            </div>
+            {% endif %}
+        {% endif %}
+
+        {% if detail.pembicara %}
+        <div class="blok">
+            <h2>Peran Pembicara</h2>
+            <p class="indikator">
+                Diarisasi hanya mengelompokkan suara; nomor pembicara adalah nomor
+                kelompok, bukan peran. Putar rekaman di atas untuk memastikan siapa
+                yang mana, lalu tetapkan perannya di sini.
+            </p>
+            <form method="post" action="/histori-content/{{ detail.audio['id_audio'] }}/peran">
+                <table>
+                    <thead>
+                        <tr><th>Pembicara</th><th>Lama Bicara</th><th>Peran</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for p in detail.pembicara %}
+                        <tr>
+                            <td style="white-space:nowrap">
+                                {{ p["speaker_label"] }}
+                                {% if detail.dinilai and p["id_speaker"] == detail.dinilai["id_speaker"] %}
+                                <span class="badge badge-diproses">dinilai</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ p["total_duration"] | durasi }}</td>
+                            <td>
+                                <select class="isian" name="peran_{{ p['id_speaker'] }}"
+                                        style="max-width:12rem">
+                                    <option value="">(belum ditetapkan)</option>
+                                    {% for pilihan in ["Guru", "Siswa", "Lainnya"] %}
+                                    <option value="{{ pilihan }}"
+                                        {% if p["role"] == pilihan %}selected{% endif %}>{{ pilihan }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <p style="margin-top:1rem">
+                    <button class="tombol tombol-utama" type="submit">Simpan peran</button>
+                </p>
+            </form>
+
+            <h2 style="margin-top:1.8rem">Nilai Ulang</h2>
+            <p class="catatan">
+                Menilai ulang memakai teks pembicara yang Anda pilih. Audionya tidak
+                diproses ulang, sehingga cepat &mdash; tetapi teks yang dinilai adalah
+                <strong>hasil pembersihan berbasis aturan saja, tanpa tahap koreksi
+                salah dengar oleh LLM</strong>. Sebutkan perbedaan ini bila skornya
+                dipakai di laporan. <strong>Skor lama akan diganti.</strong>
+            </p>
+            <form method="post" action="/histori-content/{{ detail.audio['id_audio'] }}/nilai-ulang"
+                  onsubmit="return confirm('Nilai ulang dan ganti skor yang sekarang?');">
+                <div class="aksi">
+                    <select class="isian" name="id_speaker" required style="max-width:16rem">
+                        {% for p in detail.pembicara %}
+                        <option value="{{ p['id_speaker'] }}"
+                            {% if p["role"] == "Siswa" %}selected{% endif %}>
+                            {{ p["speaker_label"] }}{% if p["role"] %} &mdash; {{ p["role"] }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button class="tombol" type="submit">Nilai ulang pembicara ini</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
         {% if detail.penilaian %}
         <div class="blok">
             <h2>Hasil Penilaian</h2>
             <table>
                 <tbody>
                     <tr><th>Topik / Pertanyaan</th><td>{{ detail.penilaian["topik"] or "-" }}</td></tr>
-                    <tr><th>Skor Akhir</th><td><span class="skor">{{ "%.2f" | format(detail.penilaian["score"]) }} / 4</span></td></tr>
+                    {% set skala = detail.penilaian["skala_maks"] or 4 %}
+                    <tr><th>Skor Akhir</th><td>
+                        <span class="skor">{{ "%.2f" | format(detail.penilaian["score"]) }} / {{ skala }}</span>
+                        {% if skala != 5 %}
+                        {# Penilaian lama memakai skala berbeda dari yang berlaku
+                           sekarang. Ini harus terbaca, karena skor 4 pada skala
+                           1-4 dan pada skala 1-5 bukan nilai yang sama. #}
+                        <span class="badge badge-diproses">skala lama 1&ndash;{{ skala }}</span>
+                        {% endif %}
+                    </td></tr>
                     <tr>
                         <th>Skor per Indikator</th>
                         <td class="indikator">
@@ -187,7 +367,10 @@
                     {% for s in detail.segmen %}
                     <tr>
                         <td style="white-space:nowrap">{{ "%.1f" | format(s["start_time"] or 0) }}s &ndash; {{ "%.1f" | format(s["end_time"] or 0) }}s</td>
-                        <td style="white-space:nowrap">{{ s["speaker_label"] }}</td>
+                        <td style="white-space:nowrap">
+                            {{ s["speaker_label"] }}
+                            {% if s["role"] %}<br><span class="peran-terpilih">{{ s["role"] }}</span>{% endif %}
+                        </td>
                         <td>{{ s["text"] }}</td>
                     </tr>
                     {% endfor %}

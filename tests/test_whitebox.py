@@ -377,10 +377,32 @@ class UjiEvaluatorLLM(unittest.TestCase):
     def test_wb021b_skor_di_luar_skala_atau_bukan_bulat_ditolak(self):
         # BUG-09: int(2.5) memotong jadi 2 dan int(True) jadi 1 — keduanya
         # dulu lolos diam-diam sebagai skor sah. Kini wajib ditolak.
-        from evaluator import parse_hasil, EvaluationError
-        for skor_salah in (0, 5, 7, -1, 2.5, "2.5", True, None, "tiga"):
+        #
+        # Batas atasnya diambil dari SKALA_MAKS, bukan ditulis tetap: skala
+        # penelitian ini pernah berubah dari 1-4 menjadi 1-5, dan uji yang
+        # menuliskan angkanya sendiri akan ikut usang tiap kali skala berubah.
+        from evaluator import parse_hasil, EvaluationError, SKALA_MIN, SKALA_MAKS
+        salah = (SKALA_MIN - 1, SKALA_MAKS + 1, SKALA_MAKS + 3, -1,
+                 2.5, "2.5", True, None, "tiga")
+        for skor_salah in salah:
             with self.assertRaises(EvaluationError, msg=f"skor {skor_salah!r} lolos"):
                 parse_hasil(self._keluaran_model(skor_relevansi=skor_salah))
+
+    def test_wb021b3_seluruh_nilai_dalam_skala_diterima(self):
+        """Tiap tingkat skala harus punya deskriptor dan lolos validasi.
+
+        Menangkap kesalahan yang mudah terjadi saat skala diubah: batas atas
+        dinaikkan tetapi deskriptor rubriknya lupa ditambah, sehingga model
+        diminta memberi skor yang tidak pernah dijelaskan artinya.
+        """
+        from evaluator import parse_hasil, RUBRIK, SKALA_MIN, SKALA_MAKS
+        for skor in range(SKALA_MIN, SKALA_MAKS + 1):
+            with self.subTest(skor=skor):
+                hasil = parse_hasil(self._keluaran_model(skor_relevansi=skor))
+                self.assertEqual(hasil["skor"]["relevansi"], skor)
+                for kunci, isi in RUBRIK.items():
+                    self.assertIn(skor, isi["deskriptor"],
+                                  f"indikator '{kunci}' tidak punya deskriptor skor {skor}")
 
     def test_wb021b2_skor_float_bulat_diterima(self):
         # JSON dapat mengirim 4.0 alih-alih 4; nilai setara bulat tetap sah.

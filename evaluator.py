@@ -26,13 +26,19 @@ if not os.getenv("LLM_API_KEY"):
         ".env sebelum melakukan commit berikutnya."
     )
 
-SKALA_MIN, SKALA_MAKS = 1, 4
+# Skala rubrik. SATU-SATUNYA tempat skala didefinisikan: objektivitas.py dan
+# modul lain mengimpornya dari sini. Sebelumnya skala ditulis ulang di
+# objektivitas.py, dan bila keduanya berbeda, Quadratic Weighted Kappa akan
+# memakai jumlah kategori yang keliru lalu menghasilkan angka yang salah tanpa
+# satu pun pesan galat.
+SKALA_MIN, SKALA_MAKS = 1, 5
 
 KATEGORI_SKOR = {
-    1: "Kurang",
-    2: "Cukup",
-    3: "Baik",
-    4: "Sangat Baik",
+    1: "Sangat Kurang",
+    2: "Kurang",
+    3: "Cukup",
+    4: "Baik",
+    5: "Sangat Baik",
 }
 
 # Rubrik Penilaian (Tabel 3.1 proposal) sebagai satu sumber kebenaran: dipakai
@@ -43,36 +49,40 @@ RUBRIK = {
         "nama": "Relevansi terhadap Pertanyaan",
         "deskriptor": {
             1: "Jawaban tidak menjawab pertanyaan atau keluar dari topik yang diminta.",
-            2: "Jawaban masih berkaitan dengan topik, namun pembahasannya melebar dan kurang fokus.",
-            3: "Jawaban sudah sesuai dengan pertanyaan, hanya terdapat sedikit bagian yang kurang fokus.",
-            4: "Jawaban sepenuhnya sesuai dengan pertanyaan dan pembahasan tetap fokus pada topik.",
+            2: "Jawaban hanya menyinggung topik sekilas, sebagian besar isinya di luar pertanyaan.",
+            3: "Jawaban masih berkaitan dengan topik, namun pembahasannya melebar dan kurang fokus.",
+            4: "Jawaban sudah sesuai dengan pertanyaan, hanya terdapat sedikit bagian yang kurang fokus.",
+            5: "Jawaban sepenuhnya sesuai dengan pertanyaan dan pembahasan tetap fokus pada topik.",
         },
     },
     "konsep": {
         "nama": "Ketepatan Konsep",
         "deskriptor": {
             1: "Konsep yang disampaikan salah atau menunjukkan pemahaman yang keliru.",
-            2: "Terdapat beberapa kesalahan konsep yang cukup memengaruhi isi jawaban.",
-            3: "Konsep yang disampaikan sebagian besar benar, hanya terdapat kesalahan kecil.",
-            4: "Seluruh konsep yang disampaikan benar dan sesuai dengan materi pembelajaran.",
+            2: "Sebagian besar konsep keliru, hanya sedikit bagian yang benar.",
+            3: "Terdapat beberapa kesalahan konsep yang cukup memengaruhi isi jawaban.",
+            4: "Konsep yang disampaikan sebagian besar benar, hanya terdapat kesalahan kecil.",
+            5: "Seluruh konsep yang disampaikan benar dan sesuai dengan materi pembelajaran.",
         },
     },
     "kelengkapan": {
         "nama": "Kelengkapan Isi",
         "deskriptor": {
             1: "Penjelasan sangat singkat dan tidak dikembangkan.",
-            2: "Penjelasan sudah ada, tetapi masih kurang rinci dan belum mencakup poin penting.",
-            3: "Penjelasan cukup lengkap dan sudah mencakup sebagian besar poin penting.",
-            4: "Penjelasan lengkap, terstruktur, dan mencakup poin-poin penting secara jelas.",
+            2: "Hanya menyebutkan poin tanpa penjelasan yang berarti.",
+            3: "Penjelasan sudah ada, tetapi masih kurang rinci dan belum mencakup poin penting.",
+            4: "Penjelasan cukup lengkap dan sudah mencakup sebagian besar poin penting.",
+            5: "Penjelasan lengkap, terstruktur, dan mencakup poin-poin penting secara jelas.",
         },
     },
     "koherensi": {
         "nama": "Koherensi dan Alur Logika",
         "deskriptor": {
             1: "Jawaban tidak runtut dan sulit diikuti alurnya.",
-            2: "Alur penjelasan kurang teratur dan terdapat lompatan ide.",
-            3: "Alur penjelasan cukup runtut meskipun masih ada sedikit lompatan ide.",
-            4: "Jawaban tersusun secara runtut, ide saling berhubungan, dan mudah dipahami.",
+            2: "Terdapat banyak lompatan ide sehingga alurnya sulit diikuti.",
+            3: "Alur penjelasan kurang teratur dan terdapat lompatan ide.",
+            4: "Alur penjelasan cukup runtut meskipun masih ada sedikit lompatan ide.",
+            5: "Jawaban tersusun secara runtut, ide saling berhubungan, dan mudah dipahami.",
         },
     },
 }
@@ -297,16 +307,29 @@ def evaluate_response(topik, jawaban_siswa):
 
 
 def format_hasil(hasil):
-    """Menyusun hasil penilaian menjadi teks untuk ditampilkan kepada guru."""
-    baris = ["=== HASIL PENILAIAN ===", ""]
+    """Menyusun hasil penilaian menjadi Markdown untuk ditampilkan kepada guru.
+
+    Memakai Markdown, bukan teks berpembatas '===', supaya skor terbaca sebagai
+    tabel dan bukan sebagai keluaran konsol. Guru membaca hasil ini untuk
+    mengambil keputusan tentang nilai siswa; keterbacaannya bagian dari mutu
+    sistem, bukan hiasan.
+    """
+    baris = [
+        f"## Skor Akhir: {hasil['skor_akhir']} dari {SKALA_MAKS}",
+        "",
+        "| Indikator | Skor | Kategori |",
+        "|---|:---:|---|",
+    ]
     for kunci, isi in RUBRIK.items():
         skor = hasil["skor"][kunci]
-        baris.append(f"{isi['nama']}: {skor} ({KATEGORI_SKOR[skor]})")
-        if hasil["alasan"].get(kunci):
-            baris.append(f"   Alasan: {hasil['alasan'][kunci]}")
-        baris.append("")
-    baris.append(f"SKOR AKHIR: {hasil['skor_akhir']} dari {SKALA_MAKS}")
-    baris.append("")
-    baris.append("=== UMPAN BALIK ===")
-    baris.append(hasil["umpan_balik"] or "(tidak ada umpan balik)")
+        baris.append(f"| {isi['nama']} | **{skor}** | {KATEGORI_SKOR[skor]} |")
+
+    alasan = [(isi["nama"], hasil["alasan"].get(kunci))
+              for kunci, isi in RUBRIK.items() if hasil["alasan"].get(kunci)]
+    if alasan:
+        baris += ["", "### Alasan Penilaian", ""]
+        baris += [f"- **{nama}** — {teks}" for nama, teks in alasan]
+
+    baris += ["", "### Umpan Balik untuk Siswa", ""]
+    baris.append(hasil["umpan_balik"] or "_(tidak ada umpan balik)_")
     return "\n".join(baris)

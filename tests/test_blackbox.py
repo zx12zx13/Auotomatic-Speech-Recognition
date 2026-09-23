@@ -227,7 +227,11 @@ class UjiSimpanDanDashboard(unittest.TestCase):
         r = c.get("/histori-content")
         self.assertEqual(r.status_code, 200)
         self.assertIn("bb022.wav", r.text)
-        self.assertIn("3.50 / 4", r.text)
+        # Penyebut diambil dari skala yang berlaku, bukan ditulis tetap: baris
+        # penilaian menyimpan skalanya sendiri agar data lama berskala 1-4
+        # tidak terbaca seolah-olah berskala sama dengan yang baru.
+        from evaluator import SKALA_MAKS
+        self.assertIn(f"3.50 / {SKALA_MAKS}", r.text)
         # Halaman penilaian ikut menampilkan skor per indikator.
         r = c.get("/nilai-content")
         self.assertIn("Relevansi: <strong>4</strong>", r.text)

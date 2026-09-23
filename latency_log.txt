@@ -1,0 +1,59 @@
+This version of torchaudio is old. SpeechBrain no longer tries using the torchaudio global backend mechanism in recipes, so if you encounter issues, update torchaudio to >=2.1.0.
+Switched audio backend to "soundfile" because you are running Windows and you are running an old torchaudio version.
+PERINGATAN: LLM_API_KEY tidak ditemukan di .env, sistem memakai kunci cadangan yang tertulis di evaluator.py.
+            Pindahkan LLM_API_KEY, LLM_BASE_URL, dan LLM_MODEL ke .env sebelum melakukan commit berikutnya.
+Memuat Whisper (small) di CPU...
+Memuat Pyannote (diarization) di CPU...
+Semua model siap.
+CATATAN: GPU tidak terdeteksi, proses berjalan di CPU dan akan lambat.
+         Bila mesin ini punya GPU NVIDIA, pasang PyTorch versi CUDA.
+Perangkat        : cpu
+Model Whisper    : small
+Waktu muat model : 62.03 detik (sekali per proses)
+Jumlah rekaman   : 3 x 1 pengulangan
+
+--- 1785225006305_Pengertian_Sistem_Komputer.wav (ulangan 1/1) ---
+Mulai validasi audio...
+Validasi audio lolos: format=.wav, durasi=183.55 detik
+Mulai pra-pemrosesan audio...
+   - Mengurangi noise...
+   - Normalisasi volume...
+Pra-pemrosesan selesai. File disimpan di: rekaman\1785225006305_Pengertian_Sistem_Komputer_processed.wav
+  0%|          | 0/18355 [00:00<?, ?frames/s] 14%|#3        | 2480/18355 [00:27<02:57, 89.66frames/s] 14%|#3        | 2480/18355 [00:40<02:57, 89.66frames/s] 28%|##7       | 5080/18355 [00:41<01:40, 132.30frames/s] 28%|##7       | 5080/18355 [00:51<01:40, 132.30frames/s] 41%|####1     | 7580/18355 [00:53<01:09, 154.94frames/s] 56%|#####6    | 10280/18355 [01:06<00:46, 175.46frames/s] 56%|#####6    | 10280/18355 [01:20<00:46, 175.46frames/s] 71%|#######1  | 13080/18355 [01:21<00:29, 178.40frames/s] 82%|########2 | 15080/18355 [01:32<00:18, 178.03frames/s] 95%|#########4| 17380/18355 [01:44<00:05, 184.33frames/s]100%|##########| 18355/18355 [01:49<00:00, 185.06frames/s]100%|##########| 18355/18355 [01:49<00:00, 167.55frames/s]
+    durasi audio 183.6s | total 541.4s | RTF 2.95
+
+--- 1785227064959_Pengertian_Sistem_Komputer.wav (ulangan 1/1) ---
+Mulai validasi audio...
+Validasi audio lolos: format=.wav, durasi=183.55 detik
+Mulai pra-pemrosesan audio...
+   - Mengurangi noise...
+   - Normalisasi volume...
+Pra-pemrosesan selesai. File disimpan di: rekaman\1785227064959_Pengertian_Sistem_Komputer_processed.wav
+  0%|          | 0/18355 [00:00<?, ?frames/s] 14%|#3        | 2496/18355 [00:36<03:51, 68.63frames/s] 14%|#3        | 2496/18355 [00:46<03:51, 68.63frames/s] 28%|##7       | 5120/18355 [01:04<02:42, 81.55frames/s] 28%|##7       | 5120/18355 [01:16<02:42, 81.55frames/s] 41%|####1     | 7576/18355 [01:29<02:02, 88.33frames/s] 41%|####1     | 7576/18355 [01:46<02:02, 88.33frames/s] 56%|#####5    | 10264/18355 [01:54<01:24, 95.85frames/s] 56%|#####5    | 10264/18355 [02:06<01:24, 95.85frames/s] 71%|#######1  | 13064/18355 [02:23<00:55, 95.09frames/s] 71%|#######1  | 13064/18355 [02:36<00:55, 95.09frames/s] 82%|########2 | 15120/18355 [02:45<00:33, 95.39frames/s] 82%|########2 | 15120/18355 [02:56<00:33, 95.39frames/s] 99%|#########8| 18120/18355 [03:10<00:02, 103.49frames/s]100%|##########| 18355/18355 [03:20<00:00, 90.92frames/s] 100%|##########| 18355/18355 [03:20<00:00, 91.67frames/s]
+    durasi audio 183.6s | total 506.0s | RTF 2.76
+
+--- 1785295437785_Apa_itu_Sistem_Komputer__.wav (ulangan 1/1) ---
+Mulai validasi audio...
+Validasi audio lolos: format=.wav, durasi=224.70 detik
+Mulai pra-pemrosesan audio...
+   - Mengurangi noise...
+   - Normalisasi volume...
+Pra-pemrosesan selesai. File disimpan di: rekaman\1785295437785_Apa_itu_Sistem_Komputer___processed.wav
+  0%|          | 0/22469 [00:00<?, ?frames/s] 13%|#3        | 2954/22469 [00:17<01:54, 170.77frames/s] 13%|#3        | 2954/22469 [00:35<01:54, 170.77frames/s] 25%|##5       | 5648/22469 [00:35<01:47, 157.01frames/s] 25%|##5       | 5648/22469 [00:46<01:47, 157.01frames/s] 35%|###5      | 7876/22469 [00:51<01:37, 150.07frames/s] 35%|###5      | 7876/22469 [01:05<01:37, 150.07frames/s] 47%|####7     | 10644/22469 [01:09<01:18, 150.24frames/s] 47%|####7     | 10644/22469 [01:25<01:18, 150.24frames/s] 59%|#####8    | 13242/22469 [01:26<01:00, 151.63frames/s] 59%|#####8    | 13242/22469 [01:45<01:00, 151.63frames/s] 71%|#######1  | 15990/22469 [01:46<00:44, 146.12frames/s] 71%|#######1  | 15990/22469 [02:05<00:44, 146.12frames/s] 82%|########2 | 18526/22469 [02:10<00:30, 129.90frames/s] 82%|########2 | 18526/22469 [02:25<00:30, 129.90frames/s] 95%|#########4| 21318/22469 [02:45<00:10, 108.06frames/s] 95%|#########4| 21318/22469 [02:56<00:10, 108.06frames/s]100%|##########| 22469/22469 [03:09<00:00, 89.04frames/s] 100%|##########| 22469/22469 [03:09<00:00, 118.26frames/s]
+    durasi audio 224.7s | total 541.5s | RTF 2.41
+
+==============================================================================
+Modul                                             Rerata (s)       RTF
+------------------------------------------------------------------------------
+Validasi audio                                          0.07     0.000
+Pra-pemrosesan audio (normalisasi + noise reduction)        8.05     0.041
+Transkripsi ASR (Whisper)                             167.81     0.851
+Speaker diarization (Pyannote)                        322.97     1.637
+Penyelarasan segmen-pembicara                           0.01     0.000
+Pra-pemrosesan teks + koreksi fonetik                   0.15     0.001
+Evaluasi LLM (Gemini)                                  30.59     0.155
+------------------------------------------------------------------------------
+Total end-to-end                                      529.63     2.685
+==============================================================================
+
+Rincian per rekaman disimpan ke: hasil_latency.csv

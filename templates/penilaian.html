@@ -45,7 +45,7 @@
                         <span>Kelengkapan: <strong>{{ p["score_kelengkapan"] }}</strong></span><br>
                         <span>Koherensi: <strong>{{ p["score_koherensi"] }}</strong></span>
                     </td>
-                    <td><span class="skor">{{ "%.2f" | format(p["score"]) }} / 4</span></td>
+                    <td><span class="skor">{{ "%.2f" | format(p["score"]) }} / {{ p["skala_maks"] }}</span></td>
                     <td class="umpan-balik">{{ p["feedback"] or "-" }}</td>
                 </tr>
                 {% endfor %}

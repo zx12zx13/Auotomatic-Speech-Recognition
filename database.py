@@ -14,6 +14,9 @@ from datetime import datetime
 import bcrypt
 from dotenv import load_dotenv
 
+# Skala rubrik berasal dari evaluator.py agar hanya ada satu sumber kebenaran.
+from evaluator import SKALA_MAKS
+
 load_dotenv()
 
 # Memakai `or`, bukan nilai default os.getenv: bila .env memuat baris
@@ -42,6 +45,11 @@ CREATE TABLE IF NOT EXISTS audio (
     filepath        TEXT,
     duration        REAL,
     processing_time REAL,
+    time_audio      REAL,
+    time_transcribe REAL,
+    time_diarize    REAL,
+    time_text       REAL,
+    time_evaluate   REAL,
     uploaded_at     TEXT NOT NULL,
     status          TEXT NOT NULL DEFAULT 'diproses',
     FOREIGN KEY (id_user) REFERENCES user(id_user)
@@ -51,6 +59,7 @@ CREATE TABLE IF NOT EXISTS speaker (
     id_speaker     INTEGER PRIMARY KEY AUTOINCREMENT,
     id_audio       INTEGER NOT NULL,
     speaker_label  TEXT NOT NULL,
+    role           TEXT,
     total_duration REAL DEFAULT 0,
     FOREIGN KEY (id_audio) REFERENCES audio(id_audio)
 );
@@ -85,6 +94,7 @@ CREATE TABLE IF NOT EXISTS assessment (
     id_user           INTEGER NOT NULL,
     topik             TEXT,
     score             REAL,
+    skala_maks        INTEGER,
     score_relevansi   INTEGER,
     score_konsep      INTEGER,
     score_kelengkapan INTEGER,
@@ -128,16 +138,58 @@ KOLOM_TAMBAHAN = [
     # rujukan.
     ("transcript", "edited_text", "TEXT"),
     ("transcript", "edited_at", "TEXT"),
+    # Peran tiap pembicara (Guru/Siswa/Lainnya), ditetapkan guru setelah
+    # mendengarkan rekaman. Diarisasi hanya mengelompokkan suara dan tidak
+    # tahu siapa yang bicara, sehingga "Pembicara 1" adalah nomor klaster,
+    # bukan peran. Tanpa kolom ini tidak ada cara memastikan sistem menilai
+    # jawaban siswa, bukan pertanyaan gurunya.
+    ("speaker", "role", "TEXT"),
+    # Lama tiap tahap, dipisahkan dari total. Proposal §3.2.5 mewajibkan
+    # pengukuran waktu proses; satu angka gabungan tidak dapat menjawab tahap
+    # mana yang sebenarnya lambat, sehingga tidak berguna untuk pembahasan.
+    ("audio", "time_audio", "REAL"),
+    ("audio", "time_transcribe", "REAL"),
+    ("audio", "time_diarize", "REAL"),
+    ("audio", "time_text", "REAL"),
+    ("audio", "time_evaluate", "REAL"),
+    # Skala rubrik yang berlaku saat penilaian dibuat. WAJIB dicatat: skala
+    # penelitian ini pernah berubah dari 1-4 menjadi 1-5, dan skor 4 pada dua
+    # skala itu bukan nilai yang sama. Tanpa kolom ini, data lama dan baru akan
+    # tercampur dalam satu perhitungan dan hasilnya tidak sah.
+    ("assessment", "skala_maks", "INTEGER"),
 ]
+
+# Peran yang boleh disimpan. Dibatasi agar isian bebas tidak menghasilkan
+# ejaan beragam ("guru", "Guru ", "GURU") yang membuat peringatan salah nilai
+# tidak pernah menyala.
+PERAN_GURU = "Guru"
+PERAN_SISWA = "Siswa"
+PERAN_LAINNYA = "Lainnya"
+PERAN_SAH = (PERAN_GURU, PERAN_SISWA, PERAN_LAINNYA)
 
 
 def _migrasi(conn):
     """Menambahkan kolom baru pada basis data yang dibuat versi sebelumnya."""
     for tabel, kolom, tipe in KOLOM_TAMBAHAN:
         ada = {r["name"] for r in conn.execute(f"PRAGMA table_info({tabel})")}
-        if kolom not in ada:
-            conn.execute(f"ALTER TABLE {tabel} ADD COLUMN {kolom} {tipe}")
-            print(f"Migrasi: kolom {tabel}.{kolom} ditambahkan.")
+        if kolom in ada:
+            continue
+        conn.execute(f"ALTER TABLE {tabel} ADD COLUMN {kolom} {tipe}")
+        print(f"Migrasi: kolom {tabel}.{kolom} ditambahkan.")
+
+        if (tabel, kolom) == ("assessment", "skala_maks"):
+            # Diisi HANYA pada saat kolomnya baru dibuat, ketika seluruh baris
+            # yang ada dipastikan berasal dari masa skala 1-4. Menjalankannya
+            # di lain waktu berisiko menandai baris skala 1-5 sebagai 1-4.
+            cur = conn.execute(
+                "UPDATE assessment SET skala_maks = 4 WHERE skala_maks IS NULL"
+            )
+            if cur.rowcount:
+                print(
+                    f"Migrasi: {cur.rowcount} penilaian lama ditandai berskala 1-4.\n"
+                    f"         Penilaian baru memakai skala 1-{SKALA_MAKS}. Keduanya "
+                    f"TIDAK boleh digabung dalam satu perhitungan."
+                )
 
 
 def init_db():
@@ -211,7 +263,7 @@ def ambil_user(id_user):
 # ==============================
 def simpan_hasil(id_user, filename, durasi, segmen, full_text, corrected_text,
                  topik=None, hasil_evaluasi=None, pembicara_dinilai=None,
-                 filepath=None, llm_text=None, waktu_proses=None):
+                 filepath=None, llm_text=None, waktu_proses=None, waktu_tahap=None):
     """Menyimpan satu proses evaluasi secara bertahap dalam satu transaksi.
 
     Urutan penyimpanan mengikuti alur proposal: audio -> speaker -> transcript
@@ -233,18 +285,26 @@ def simpan_hasil(id_user, filename, durasi, segmen, full_text, corrected_text,
         filepath: lokasi salinan rekaman yang disimpan sistem, agar guru dapat
             memutar ulang audionya dari histori dan mencocokkannya dengan
             transkrip. None bila rekaman tidak disalin.
-        waktu_proses: lama pemrosesan satu rekaman dalam detik.
+        waktu_proses: lama SELURUH pemrosesan dalam detik.
+        waktu_tahap: dict lama tiap tahap dalam detik, dengan kunci 'audio',
+            'transcribe', 'diarize', 'text', dan 'evaluate'. Dipisahkan dari
+            waktu_proses karena satu angka gabungan tidak dapat menjawab tahap
+            mana yang lambat, sedangkan itulah yang dibahas pada laporan.
 
     Mengembalikan id_audio.
     """
     segmen = segmen or []
+    tahap = waktu_tahap or {}
     with get_conn() as conn:
         # 1. audio
         cur = conn.execute(
             "INSERT INTO audio (id_user, filename, filepath, duration,"
-            " processing_time, uploaded_at, status)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (id_user, filename, filepath, durasi, waktu_proses, _sekarang(), "selesai"),
+            " processing_time, time_audio, time_transcribe, time_diarize,"
+            " time_text, time_evaluate, uploaded_at, status)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (id_user, filename, filepath, durasi, waktu_proses,
+             tahap.get("audio"), tahap.get("transcribe"), tahap.get("diarize"),
+             tahap.get("text"), tahap.get("evaluate"), _sekarang(), "selesai"),
         )
         id_audio = cur.lastrowid
 
@@ -290,14 +350,16 @@ def simpan_hasil(id_user, filename, durasi, segmen, full_text, corrected_text,
             skor = hasil_evaluasi.get("skor", {})
             conn.execute(
                 "INSERT INTO assessment (id_audio, id_speaker, id_user, topik, score,"
-                " score_relevansi, score_konsep, score_kelengkapan, score_koherensi,"
-                " feedback, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " skala_maks, score_relevansi, score_konsep, score_kelengkapan,"
+                " score_koherensi, feedback, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     id_audio,
                     peta_speaker.get(pembicara_dinilai),
                     id_user,
                     topik,
                     hasil_evaluasi.get("skor_akhir"),
+                    SKALA_MAKS,
                     skor.get("relevansi"),
                     skor.get("konsep"),
                     skor.get("kelengkapan"),
@@ -330,11 +392,24 @@ def statistik_user(id_user):
             "SELECT COUNT(*) AS n, AVG(score) AS rata FROM assessment WHERE id_user = ?",
             (id_user,),
         ).fetchone()
+        skala = [r["s"] for r in conn.execute(
+            "SELECT DISTINCT COALESCE(skala_maks, 4) AS s FROM assessment"
+            " WHERE id_user = ? ORDER BY s",
+            (id_user,),
+        )]
+
+    # Rata-rata lintas skala TIDAK sah: skor 4 pada skala 1-4 adalah nilai
+    # tertinggi, sedangkan pada skala 1-5 hanya nilai kedua tertinggi.
+    # Merata-ratakannya menghasilkan angka yang tidak berarti apa-apa, jadi
+    # angkanya ditahan dan percampurannya dilaporkan.
+    campur = len(skala) > 1
     return {
         "jumlah_audio": audio["n"],
         "total_durasi": audio["total_durasi"],
         "jumlah_penilaian": nilai["n"],
-        "rata_skor": nilai["rata"],  # None bila belum ada penilaian
+        "rata_skor": None if campur else nilai["rata"],
+        "skala": skala,
+        "skala_tercampur": campur,
     }
 
 
@@ -345,7 +420,8 @@ def ambil_histori(id_user):
             """
             SELECT a.id_audio, a.filename, a.duration, a.processing_time,
                    a.filepath, a.uploaded_at, a.status,
-                   s.score, s.created_at AS waktu_nilai
+                   s.score, COALESCE(s.skala_maks, 4) AS skala_maks,
+                   s.created_at AS waktu_nilai
             FROM audio a
             LEFT JOIN assessment s ON s.id_audio = a.id_audio
             WHERE a.id_user = ?
@@ -360,7 +436,8 @@ def ambil_penilaian(id_user):
     with get_conn() as conn:
         return conn.execute(
             """
-            SELECT s.id_assessment, s.topik, s.score, s.score_relevansi,
+            SELECT s.id_assessment, s.topik, s.score,
+                   COALESCE(s.skala_maks, 4) AS skala_maks, s.score_relevansi,
                    s.score_konsep, s.score_kelengkapan, s.score_koherensi,
                    s.feedback, s.created_at, a.filename, sp.speaker_label
             FROM assessment s
@@ -391,7 +468,7 @@ def ambil_detail_audio(id_audio, id_user):
         ).fetchone()
         segmen = conn.execute(
             """
-            SELECT sg.start_time, sg.end_time, sg.text, sp.speaker_label
+            SELECT sg.start_time, sg.end_time, sg.text, sp.speaker_label, sp.role
             FROM segment sg
             JOIN speaker sp ON sp.id_speaker = sg.id_speaker
             WHERE sp.id_audio = ?
@@ -402,12 +479,31 @@ def ambil_detail_audio(id_audio, id_user):
         penilaian = conn.execute(
             "SELECT * FROM assessment WHERE id_audio = ?", (id_audio,)
         ).fetchone()
+        pembicara = conn.execute(
+            "SELECT id_speaker, speaker_label, role, total_duration FROM speaker"
+            " WHERE id_audio = ? ORDER BY speaker_label",
+            (id_audio,),
+        ).fetchall()
+
+    # Peran pembicara yang dinilai dicari di sini, bukan di templat: halaman
+    # detail harus dapat memperingatkan bila yang dinilai ternyata GURU, dan
+    # peringatan itu tidak boleh bergantung pada logika yang tercecer di HTML.
+    dinilai = None
+    if penilaian:
+        dinilai = next(
+            (p for p in pembicara if p["id_speaker"] == penilaian["id_speaker"]), None
+        )
 
     return {
         "audio": audio,
         "transkrip": transkrip,
         "segmen": segmen,
         "penilaian": penilaian,
+        "pembicara": pembicara,
+        # Pembicara yang skornya tercatat. None berarti penilaian menggabung
+        # SELURUH pembicara -- termasuk ucapan guru -- yang membuat skor
+        # siswa terangkat oleh kalimat yang bukan miliknya.
+        "dinilai": dinilai,
     }
 
 
@@ -468,6 +564,123 @@ def perbarui_topik(id_audio, id_user, topik):
             (topik or None, id_audio, id_user),
         )
         return cur.rowcount > 0
+
+
+def perbarui_peran(id_audio, id_user, peran):
+    """Menetapkan peran (Guru/Siswa/Lainnya) untuk tiap pembicara.
+
+    Argumen `peran` adalah dict {id_speaker: peran}. Nilai di luar `PERAN_SAH`
+    diperlakukan sebagai "belum dilabeli" (NULL), bukan disimpan apa adanya:
+    ejaan yang beragam akan membuat pemeriksaan "yang dinilai ternyata guru"
+    gagal menyala justru saat paling dibutuhkan.
+
+    Mengembalikan jumlah pembicara yang perannya tersimpan, atau False bila
+    proses tidak ditemukan/bukan milik pengguna ini.
+    """
+    with get_conn() as conn:
+        milik = conn.execute(
+            "SELECT 1 FROM audio WHERE id_audio = ? AND id_user = ?",
+            (id_audio, id_user),
+        ).fetchone()
+        if not milik:
+            return False
+
+        jumlah = 0
+        for id_speaker, nilai in (peran or {}).items():
+            nilai = nilai if nilai in PERAN_SAH else None
+            cur = conn.execute(
+                # id_audio ikut disaring supaya id_speaker milik rekaman lain
+                # tidak dapat diubah lewat kiriman formulir yang dirakit sendiri.
+                "UPDATE speaker SET role = ? WHERE id_speaker = ? AND id_audio = ?",
+                (nilai, id_speaker, id_audio),
+            )
+            jumlah += cur.rowcount
+    return jumlah
+
+
+def teks_pembicara_tersimpan(id_audio, id_user, id_speaker):
+    """Mengambil segmen satu pembicara dari basis data, terurut menurut waktu.
+
+    Dipakai untuk menilai ulang pembicara yang berbeda tanpa memproses ulang
+    audionya: segmen per pembicara sudah tersimpan sejak pemrosesan pertama.
+
+    Mengembalikan daftar dict berbentuk sama seperti keluaran diarisasi di
+    app.py, agar dapat langsung diberikan ke `susun_teks_pembicara`.
+    """
+    with get_conn() as conn:
+        milik = conn.execute(
+            "SELECT 1 FROM audio WHERE id_audio = ? AND id_user = ?",
+            (id_audio, id_user),
+        ).fetchone()
+        if not milik:
+            return None
+        baris = conn.execute(
+            """
+            SELECT sp.speaker_label, sg.start_time, sg.end_time, sg.text
+            FROM segment sg
+            JOIN speaker sp ON sp.id_speaker = sg.id_speaker
+            WHERE sp.id_audio = ? AND sp.id_speaker = ?
+            ORDER BY sg.start_time
+            """,
+            (id_audio, id_speaker),
+        ).fetchall()
+
+    return [
+        {
+            "pembicara": r["speaker_label"],
+            "mulai": r["start_time"],
+            "selesai": r["end_time"],
+            "teks": r["text"],
+        }
+        for r in baris
+    ]
+
+
+def ganti_penilaian(id_audio, id_user, id_speaker, topik, hasil_evaluasi):
+    """Mengganti penilaian sebuah proses dengan hasil penilaian ulang.
+
+    Dipakai ketika ternyata sistem menilai pembicara yang keliru. Baris lama
+    DIGANTI, bukan ditambah: satu proses hanya boleh punya satu skor berlaku,
+    dan dua baris penilaian pada audio yang sama akan membuat ekspor data
+    penelitian menghitung rekaman itu dua kali.
+
+    `id_speaker` selalu tercatat, sehingga siapa yang dinilai tidak pernah
+    lagi menjadi tebakan.
+
+    Mengembalikan True bila berhasil, False bila proses tidak ditemukan atau
+    bukan milik pengguna ini.
+    """
+    with get_conn() as conn:
+        milik = conn.execute(
+            "SELECT 1 FROM audio WHERE id_audio = ? AND id_user = ?",
+            (id_audio, id_user),
+        ).fetchone()
+        if not milik:
+            return False
+
+        conn.execute("DELETE FROM assessment WHERE id_audio = ?", (id_audio,))
+        skor = (hasil_evaluasi or {}).get("skor", {})
+        conn.execute(
+            "INSERT INTO assessment (id_audio, id_speaker, id_user, topik, score,"
+            " skala_maks, score_relevansi, score_konsep, score_kelengkapan,"
+            " score_koherensi, feedback, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                id_audio,
+                id_speaker,
+                id_user,
+                topik,
+                (hasil_evaluasi or {}).get("skor_akhir"),
+                SKALA_MAKS,
+                skor.get("relevansi"),
+                skor.get("konsep"),
+                skor.get("kelengkapan"),
+                skor.get("koherensi"),
+                (hasil_evaluasi or {}).get("umpan_balik"),
+                _sekarang(),
+            ),
+        )
+    return True
 
 
 def hapus_histori(id_audio, id_user):

@@ -46,7 +46,9 @@
                     </td>
                     <td>
                         {% if h["score"] is not none %}
-                        <span class="skor">{{ "%.2f" | format(h["score"]) }} / 4</span>
+                        {# Skala diambil dari barisnya sendiri, bukan ditulis tetap:
+                           penilaian lama berskala 1-4 dan yang baru 1-5. #}
+                        <span class="skor">{{ "%.2f" | format(h["score"]) }} / {{ h["skala_maks"] }}</span>
                         {% else %}
                         <span class="skor-kosong">tidak dinilai</span>
                         {% endif %}

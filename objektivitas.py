@@ -31,21 +31,21 @@ Rumus Cohen's Kappa:
 
 Rumus Quadratic Weighted Kappa:
     kappa_w = 1 - (sum(w_ij * O_ij) / sum(w_ij * E_ij))
-        w_ij = (i - j)^2 / (k - 1)^2,  k = jumlah kategori skor (4)
+        w_ij = (i - j)^2 / (k - 1)^2,  k = jumlah kategori skor
 """
 import csv
 import os
 import sys
 
-SKALA_MIN, SKALA_MAKS = 1, 4
+# Skala dan nama indikator DIIMPOR dari evaluator.py, tidak ditulis ulang.
+# Sebelumnya keduanya punya salinan sendiri; bila salah satu diubah tanpa yang
+# lain, bobot w_ij memakai jumlah kategori yang keliru dan Kappa keluar salah
+# tanpa pesan galat apa pun -- kesalahan yang mustahil terlihat dari hasilnya.
+from evaluator import SKALA_MIN, SKALA_MAKS, RUBRIK
+
 KATEGORI = list(range(SKALA_MIN, SKALA_MAKS + 1))
 
-INDIKATOR = {
-    "relevansi": "Relevansi terhadap Pertanyaan",
-    "konsep": "Ketepatan Konsep",
-    "kelengkapan": "Kelengkapan Isi",
-    "koherensi": "Koherensi dan Alur Logika",
-}
+INDIKATOR = {kunci: isi["nama"] for kunci, isi in RUBRIK.items()}
 
 KOLOM = ["id_audio", "filename", "topik"]
 for _k in INDIKATOR:
@@ -192,7 +192,7 @@ def ekspor_dari_basis_data(path="objektivitas_data.csv"):
     print("\nLangkah berikutnya:")
     print("  1. Minta guru menilai rekaman yang SAMA memakai rubrik yang sama,")
     print("     TANPA melihat kolom *_sistem (agar tidak terpengaruh).")
-    print("  2. Isi kolom *_guru dengan skor guru (1-4).")
+    print(f"  2. Isi kolom *_guru dengan skor guru ({SKALA_MIN}-{SKALA_MAKS}).")
     print(f"  3. Jalankan: python objektivitas.py {path}")
 
 

@@ -182,8 +182,15 @@
                 </div>
                 <div class="info-card">
                     <h3>Skor Rata-rata</h3>
-                    {% if stat.rata_skor is not none %}
-                    <p class="value">{{ "%.2f" | format(stat.rata_skor) }} <small>/ 4</small></p>
+                    {% if stat.skala_tercampur %}
+                    {# Merata-ratakan skala 1-4 dan 1-5 menghasilkan angka yang
+                       tidak berarti apa-apa. Lebih baik tidak menampilkan angka
+                       daripada menampilkan angka yang menyesatkan. #}
+                    <p class="value"><small>skala tercampur
+                        ({{ stat.skala | join(' dan ') }}) &mdash; tidak dirata-ratakan</small></p>
+                    {% elif stat.rata_skor is not none %}
+                    <p class="value">{{ "%.2f" | format(stat.rata_skor) }}
+                        <small>/ {{ stat.skala[0] }}</small></p>
                     {% else %}
                     <p class="value"><small>belum ada</small></p>
                     {% endif %}

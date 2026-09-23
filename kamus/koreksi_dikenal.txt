@@ -1,0 +1,43 @@
+# Pasangan salah dengar yang sudah terbukti: salah = benar
+#
+# Kamus ini diperiksa PALING DAHULU, sehingga MENGALAHKAN gerbang kamus.
+# Konsekuensinya harus disadari: kata yang sah dalam bahasa Indonesia pun akan
+# tergantikan bila ditulis di sini. Contohnya "bait" -- kata sah yang berarti
+# baris puisi, tetapi pada materi Sistem Komputer hampir pasti "byte".
+#
+# Karena itu: HANYA tulis pasangan yang bentuk benarnya tidak meragukan pada
+# mata pelajaran yang diujikan. Bila sebuah rekaman ternyata membahas puisi,
+# baris "bait" di bawah harus dinonaktifkan.
+#
+# Kamus ini perlu karena sebagian kesalahan ASR tidak punya hubungan tulisan
+# maupun kode fonetik dengan kata sasarannya. "hater" dan "hardware" berbeda
+# rangka konsonannya, sehingga tidak ada algoritma kemiripan yang akan
+# mempertemukan keduanya -- hubungannya ada di ranah bunyi yang terdengar,
+# bukan yang tertulis.
+#
+# Daftar ini TUMBUH DARI PENGAMATAN. Setiap kali ditemukan salah dengar baru
+# pada transkrip sungguhan, tambahkan barisnya di sini.
+
+# --- Teramati pada rekaman uji "Pengertian Sistem Komputer" ---
+hater = hardware
+trainware = brainware
+penyelasan = penjelasan
+diselukuh = disentuh
+
+# --- Istilah serapan yang dilafalkan cara Indonesia ---
+# (contoh yang disebut proposal: byte tertranskripsi menjadi bait)
+bait = byte
+bait-bait = byte
+kes = cache
+kesh = cache
+kyu = queue
+sofwer = software
+softwer = software
+hardwer = hardware
+hardwar = hardware
+brainwer = brainware
+prosesing = processing
+kompiuter = komputer
+komputor = komputer
+mikrosof = Microsoft
+maikrosoft = Microsoft

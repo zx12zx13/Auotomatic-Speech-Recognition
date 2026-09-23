@@ -33,7 +33,8 @@ def _buat_rekaman_uji(nama="rekaman_uji.wav", isi=b"RIFF-palsu-untuk-uji"):
     return lokasi
 
 
-def _simpan(id_user, filepath=None, waktu_proses=None, topik="Jelaskan fotosintesis."):
+def _simpan(id_user, filepath=None, waktu_proses=None, topik="Jelaskan fotosintesis.",
+            waktu_tahap=None):
     return db.simpan_hasil(
         id_user=id_user,
         filename="ujian_lisan.wav",
@@ -47,6 +48,7 @@ def _simpan(id_user, filepath=None, waktu_proses=None, topik="Jelaskan fotosinte
         pembicara_dinilai="Pembicara 1",
         filepath=filepath,
         waktu_proses=waktu_proses,
+        waktu_tahap=waktu_tahap,
     )
 
 
@@ -140,6 +142,114 @@ class UjiLamaProses(unittest.TestCase):
 
         r = c.get(f"/histori-content/{id_audio}")
         self.assertIn("Lama proses -", r.text)
+
+
+class UjiWaktuPerTahap(unittest.TestCase):
+    """Lama tiap tahap dicatat terpisah dari totalnya.
+
+    Satu angka gabungan tidak dapat menjawab tahap mana yang lambat, padahal
+    itulah yang dibahas pada laporan. Transkripsi di CPU berjalan berkali lipat
+    lebih lama daripada tahap lain, dan itu harus terbaca sendiri agar
+    kesimpulan tentang kelayakan pakai sistem tidak salah menuding.
+    """
+
+    TAHAP = {"audio": 12.5, "transcribe": 480.0, "diarize": 150.0,
+             "text": 0.05, "evaluate": 21.6}
+
+    def test_tiap_tahap_tersimpan_terpisah(self):
+        _, id_user = util_uji.klien_login()
+        id_audio = _simpan(id_user, waktu_proses=664.2, waktu_tahap=self.TAHAP)
+
+        a = db.ambil_detail_audio(id_audio, id_user)["audio"]
+        self.assertAlmostEqual(a["time_transcribe"], 480.0)
+        self.assertAlmostEqual(a["time_diarize"], 150.0)
+        self.assertAlmostEqual(a["time_text"], 0.05)
+        self.assertAlmostEqual(a["time_evaluate"], 21.6)
+        self.assertAlmostEqual(a["time_audio"], 12.5)
+        # Total tetap ada dan tidak tertimpa salah satu tahap.
+        self.assertAlmostEqual(a["processing_time"], 664.2)
+
+    def test_rincian_tampil_di_halaman_detail(self):
+        c, id_user = util_uji.klien_login()
+        id_audio = _simpan(id_user, waktu_proses=664.2, waktu_tahap=self.TAHAP)
+
+        r = c.get(f"/histori-content/{id_audio}")
+        self.assertIn("Rincian Waktu Proses", r.text)
+        self.assertIn("Transkripsi (Whisper)", r.text)
+        self.assertIn("480.0 dtk", r.text)
+        # Bagian terhadap total ikut ditampilkan: 480/664,2 = 72%.
+        self.assertIn("72%", r.text)
+
+    def test_proses_lama_tanpa_rincian_tidak_menampilkan_tabel_kosong(self):
+        c, id_user = util_uji.klien_login()
+        id_audio = _simpan(id_user, waktu_proses=100.0, waktu_tahap=None)
+
+        r = c.get(f"/histori-content/{id_audio}")
+        self.assertNotIn("Rincian Waktu Proses", r.text)
+
+
+class UjiSkalaRubrik(unittest.TestCase):
+    """Skala rubrik dicatat pada tiap penilaian.
+
+    Skala penelitian ini pernah berubah dari 1-4 menjadi 1-5. Skor 4 pada dua
+    skala itu bukan nilai yang sama, sehingga tanpa pencatatan skala, data
+    lama dan baru akan tercampur dalam satu perhitungan dan hasilnya tidak sah.
+    """
+
+    def test_penilaian_baru_mencatat_skala_berlaku(self):
+        from evaluator import SKALA_MAKS
+
+        _, id_user = util_uji.klien_login()
+        id_audio = _simpan(id_user)
+        p = db.ambil_detail_audio(id_audio, id_user)["penilaian"]
+        self.assertEqual(p["skala_maks"], SKALA_MAKS)
+
+    def test_penilaian_ulang_juga_mencatat_skala(self):
+        from evaluator import SKALA_MAKS
+
+        _, id_user = util_uji.klien_login()
+        id_audio = _simpan(id_user)
+        id_speaker = db.ambil_detail_audio(id_audio, id_user)["pembicara"][0]["id_speaker"]
+        db.ganti_penilaian(id_audio, id_user, id_speaker, "Topik",
+                           util_uji.HASIL_EVALUASI_CONTOH)
+
+        p = db.ambil_detail_audio(id_audio, id_user)["penilaian"]
+        self.assertEqual(p["skala_maks"], SKALA_MAKS)
+
+    def test_skala_lama_ditandai_di_halaman(self):
+        """Penilaian berskala lama harus terbaca sebagai skala lama."""
+        c, id_user = util_uji.klien_login()
+        id_audio = _simpan(id_user)
+        with db.get_conn() as conn:
+            conn.execute("UPDATE assessment SET skala_maks = 4 WHERE id_audio = ?",
+                         (id_audio,))
+
+        r = c.get(f"/histori-content/{id_audio}")
+        self.assertIn("skala lama 1", r.text)
+        self.assertIn("3.50 / 4", r.text)
+
+    def test_rata_rata_tidak_dihitung_bila_skala_tercampur(self):
+        """Merata-ratakan lintas skala menghasilkan angka tanpa arti."""
+        _, id_user = util_uji.klien_login()
+        id_a = _simpan(id_user)
+        _simpan(id_user)
+        with db.get_conn() as conn:
+            conn.execute("UPDATE assessment SET skala_maks = 4 WHERE id_audio = ?",
+                         (id_a,))
+
+        stat = db.statistik_user(id_user)
+        self.assertTrue(stat["skala_tercampur"])
+        self.assertIsNone(stat["rata_skor"])
+        self.assertEqual(stat["skala"], [4, 5])
+
+    def test_rata_rata_dihitung_bila_skala_seragam(self):
+        _, id_user = util_uji.klien_login()
+        _simpan(id_user)
+        _simpan(id_user)
+
+        stat = db.statistik_user(id_user)
+        self.assertFalse(stat["skala_tercampur"])
+        self.assertAlmostEqual(stat["rata_skor"], 3.5)
 
 
 class UjiSuntingHistori(unittest.TestCase):

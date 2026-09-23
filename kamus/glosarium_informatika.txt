@@ -1,0 +1,120 @@
+# Glosarium istilah Informatika Kelas VII (materi Sistem Komputer).
+#
+# Berisi kata yang dianggap SUDAH BENAR sekaligus menjadi kandidat pengganti
+# bagi kata yang salah didengar ASR. Istilah di sini diutamakan daripada kata
+# umum saat jaraknya seri, sesuai fokus proposal pada istilah teknis.
+#
+# Satu istilah per baris, satu kata per baris. Istilah dua kata (mis.
+# "perangkat keras") ditulis terpisah karena pencocokan bekerja per kata.
+#
+# Tambahkan istilah sesuai materi yang diujikan. Makin sesuai daftar ini
+# dengan topik rekaman, makin tepat koreksinya.
+
+# --- Golongan sistem komputer ---
+hardware
+software
+brainware
+perangkat
+keras
+lunak
+
+# --- Perangkat masukan ---
+keyboard
+mouse
+tetikus
+scanner
+pemindai
+mikrofon
+microphone
+joystick
+touchpad
+webcam
+
+# --- Perangkat keluaran ---
+monitor
+layar
+printer
+pencetak
+speaker
+proyektor
+plotter
+headphone
+
+# --- Perangkat pemroses dan penyimpanan ---
+prosesor
+processor
+motherboard
+northbridge
+southbridge
+harddisk
+flashdisk
+memori
+RAM
+ROM
+CPU
+GPU
+SSD
+chip
+kartu
+grafis
+
+# --- Perangkat lunak ---
+sistem
+operasi
+aplikasi
+program
+antivirus
+browser
+Windows
+Linux
+Android
+Microsoft
+Word
+Excel
+PowerPoint
+Office
+
+# --- Satuan dan konsep dasar ---
+byte
+bit
+kilobyte
+megabyte
+gigabyte
+terabyte
+cache
+queue
+biner
+digital
+analog
+algoritma
+data
+informasi
+berkas
+folder
+jaringan
+internet
+server
+klien
+komputer
+elektronik
+komponen
+instruksi
+
+# --- Kata kerja dan sifat yang sering muncul pada penjelasan ---
+masukan
+keluaran
+input
+output
+proses
+pemroses
+pengolahan
+mengolah
+menghasilkan
+menyimpan
+menampilkan
+memasukkan
+berhubungan
+berinteraksi
+pengguna
+penggunanya
+fungsi

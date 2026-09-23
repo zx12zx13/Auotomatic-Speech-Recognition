@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 # Impor fungsi untuk membuat aplikasi Gradio dari app.py
 from app import create_unified_app, tema_modul, CSS_SELARAS
+from evaluator import evaluate_response, EvaluationError
+from text_preprocessing import susun_teks_pembicara
 import database as db
 from session import sesi_aktif
 
@@ -181,6 +183,108 @@ async def histori_sunting(
     db.perbarui_topik(id_audio, user.id_user, topik)
 
     return RedirectResponse(url=f"/histori-content/{id_audio}", status_code=303)
+
+
+@app.post("/histori-content/{id_audio}/peran")
+async def histori_peran(
+    request: Request, id_audio: int, user: User = Depends(get_current_user)
+):
+    """Menyimpan peran tiap pembicara yang ditetapkan guru.
+
+    Medan formulirnya dinamis (`peran_<id_speaker>`) karena jumlah pembicara
+    berbeda tiap rekaman, sehingga dibaca langsung dari request.form().
+    """
+    if not user:
+        return HTMLResponse("Akses ditolak.", status_code=403)
+
+    form = await request.form()
+    peran = {}
+    for kunci, nilai in form.items():
+        if not kunci.startswith("peran_"):
+            continue
+        try:
+            peran[int(kunci[len("peran_"):])] = nilai
+        except ValueError:
+            continue
+
+    if db.perbarui_peran(id_audio, user.id_user, peran) is False:
+        return HTMLResponse("Data tidak ditemukan.", status_code=404)
+
+    return RedirectResponse(url=f"/histori-content/{id_audio}", status_code=303)
+
+
+# Ditulis `def`, bukan `async def`: penilaian ulang memanggil LLM dan memblokir
+# selama puluhan detik. Pada rute async, blokade itu menghentikan seluruh
+# server; pada rute biasa FastAPI menjalankannya di threadpool.
+@app.post("/histori-content/{id_audio}/nilai-ulang")
+def histori_nilai_ulang(
+    request: Request,
+    id_audio: int,
+    id_speaker: int = Form(...),
+    user: User = Depends(get_current_user),
+):
+    """Menilai ulang rekaman memakai teks pembicara yang benar.
+
+    Dipakai bila ternyata sistem menilai pembicara yang keliru -- misalnya
+    menilai pertanyaan guru sebagai jawaban siswa. Audionya TIDAK diproses
+    ulang: segmen tiap pembicara sudah tersimpan, sehingga teks pembicara lain
+    dapat disusun kembali seketika.
+
+    Catatan penting: teks yang dinilai di sini adalah hasil pembersihan
+    berbasis aturan SAJA, tanpa tahap koreksi salah dengar oleh LLM (tahap itu
+    memakan waktu belasan menit dan tidak layak dijalankan di dalam satu
+    permintaan HTTP). Perbedaan ini disebutkan di halaman agar tidak
+    disalahartikan sebagai penilaian yang setara dengan pemrosesan pertama.
+    """
+    if not user:
+        return HTMLResponse("Akses ditolak.", status_code=403)
+
+    detail = db.ambil_detail_audio(id_audio, user.id_user)
+    if detail is None:
+        return HTMLResponse("Data tidak ditemukan.", status_code=404)
+
+    topik = detail["penilaian"]["topik"] if detail["penilaian"] else None
+    if not topik or not topik.strip():
+        return _detail_dengan_pesan(
+            request, id_audio, user,
+            "Penilaian ulang butuh topik/pertanyaan. Isi lebih dahulu lewat "
+            "kotak Sunting di bawah, lalu ulangi.")
+
+    segmen = db.teks_pembicara_tersimpan(id_audio, user.id_user, id_speaker)
+    if not segmen:
+        return _detail_dengan_pesan(
+            request, id_audio, user,
+            "Pembicara itu tidak punya segmen tersimpan, sehingga tidak ada "
+            "teks yang dapat dinilai.")
+
+    teks = susun_teks_pembicara(segmen, segmen[0]["pembicara"])
+    if not teks:
+        return _detail_dengan_pesan(
+            request, id_audio, user, "Teks pembicara itu kosong setelah pra-pemrosesan.")
+
+    try:
+        hasil = evaluate_response(topik, teks)
+    except EvaluationError as e:
+        # Kegagalan penilaian ulang tidak boleh menghapus skor yang lama:
+        # `ganti_penilaian` baru dipanggil setelah hasil sah diperoleh.
+        return _detail_dengan_pesan(
+            request, id_audio, user, f"Penilaian ulang GAGAL: {e}")
+
+    db.ganti_penilaian(id_audio, user.id_user, id_speaker, topik, hasil)
+    return RedirectResponse(url=f"/histori-content/{id_audio}", status_code=303)
+
+
+def _detail_dengan_pesan(request, id_audio, user, pesan):
+    """Menampilkan halaman detail beserta satu pesan kesalahan.
+
+    Dipakai agar kegagalan penilaian ulang muncul di halaman yang sama, bukan
+    sebagai halaman galat telanjang yang membuat guru kehilangan konteks dan
+    harus menekan tombol kembali.
+    """
+    return templates.TemplateResponse(
+        request, "histori_detail.html",
+        {"detail": db.ambil_detail_audio(id_audio, user.id_user), "pesan_galat": pesan},
+    )
 
 
 @app.post("/histori-content/{id_audio}/hapus")

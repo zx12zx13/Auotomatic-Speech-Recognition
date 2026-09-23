@@ -143,11 +143,27 @@ class UjiBacaData(unittest.TestCase):
         self.assertIn("terisi sebagian", str(ctx.exception))
 
     def test_skor_di_luar_skala_ditolak(self):
+        # Angkanya diturunkan dari SKALA_MAKS, bukan ditulis tetap, agar uji
+        # ini tetap menguji batas yang benar saat skala rubrik berubah.
+        luar = ob.SKALA_MAKS + 1
         p = self._tulis("ob_luar.csv", self.KEPALA +
-                        "1,a.wav,Topik,5,3,3,3,2,2,3,4\n")
+                        f"1,a.wav,Topik,{luar},3,3,3,2,2,3,4\n")
         with self.assertRaises(ob.DataTidakSah) as ctx:
             ob.baca_data(p)
         self.assertIn("di luar skala", str(ctx.exception))
+
+    def test_skala_mengikuti_evaluator(self):
+        """Skala tidak boleh punya salinan sendiri di modul ini.
+
+        Bila objektivitas.py dan evaluator.py memakai skala berbeda, bobot
+        w_ij pada Quadratic Weighted Kappa dihitung dengan jumlah kategori
+        yang keliru -- dan hasilnya keluar sebagai angka yang tampak wajar,
+        tanpa satu pun pesan galat.
+        """
+        import evaluator
+        self.assertEqual(ob.SKALA_MAKS, evaluator.SKALA_MAKS)
+        self.assertEqual(ob.SKALA_MIN, evaluator.SKALA_MIN)
+        self.assertEqual(len(ob.KATEGORI), evaluator.SKALA_MAKS)
 
     def test_skor_bukan_angka_ditolak(self):
         p = self._tulis("ob_teks.csv", self.KEPALA +

@@ -14,7 +14,8 @@ from pydub import AudioSegment, effects
 from dotenv import load_dotenv
 
 from evaluator import evaluate_response, format_hasil, EvaluationError
-from text_preprocessing import susun_teks_pembicara, daftar_pembicara, koreksi_asr_llm
+from text_preprocessing import susun_teks_pembicara, daftar_pembicara
+from koreksi_fonetik import koreksi_asr_aturan
 from session import id_user_dari_token
 import database as db
 
@@ -262,12 +263,17 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, mo
     num_speakers = min(int(num_speakers_val), MAX_SPEAKERS)
     print(f"Mulai pipeline ASR (Model: {model_name}) dan Diarization...")
 
-    # Lama proses dihitung dari titik ini, mencakup seluruh tahap (validasi,
-    # pra-pemrosesan audio, transkripsi, diarisasi, koreksi, penilaian).
-    # Angka ini dilaporkan di histori sebagai indikator kelayakan pakai
-    # sistem: transkripsi yang lebih lama daripada mendengarkan rekamannya
-    # sendiri adalah temuan yang harus terlihat, bukan tersamar.
+    # Lama proses dicatat PER TAHAP, bukan hanya totalnya. Satu angka gabungan
+    # tidak dapat menjawab tahap mana yang sebenarnya lambat, padahal itulah
+    # yang perlu dibahas: transkripsi di CPU berjalan berkali-kali lipat lebih
+    # lama daripada tahap lain, dan itu harus terbaca terpisah agar kesimpulan
+    # tentang kelayakan pakai sistem tidak salah menuding tahap yang keliru.
     mulai_proses = time.perf_counter()
+    waktu_tahap = {}
+
+    def catat(nama, sejak):
+        waktu_tahap[nama] = round(time.perf_counter() - sejak, 2)
+        return time.perf_counter()
 
     # Validasi Audio: berkas yang tidak layak dihentikan di sini agar tidak
     # menimbulkan kesalahan pada tahap pemrosesan berikutnya.
@@ -282,6 +288,8 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, mo
     # Pra-pemrosesan Audio
     progress(0.15, desc="Pra-pemrosesan audio (noise reduction & normalisasi)...")
     processed_audio = preprocess_audio(audio_file)
+    # Tahap 'audio' mencakup validasi sekaligus noise reduction dan normalisasi.
+    penanda = catat("audio", mulai_proses)
 
     dialogue = ""
     # Tiga versi teks disimpan terpisah agar jejak pemrosesan dapat ditelusuri:
@@ -303,7 +311,8 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, mo
             fp16=(DEVICE == "cuda"),
         )
         full_text = result.get("text", "Transkripsi gagal.").strip()
-        print("Transkripsi Whisper selesai.")
+        penanda = catat("transcribe", penanda)
+        print(f"Transkripsi Whisper selesai ({waktu_tahap['transcribe']:.1f} detik).")
 
         # 2. Diarisasi Pyannote
         progress(0.60, desc="Mengidentifikasi pembicara (Pyannote Diarization)...")
@@ -342,7 +351,8 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, mo
                 "selesai": seg_end,
                 "teks": segment['text'].strip(),
             })
-        print("Pipeline diarization selesai.")
+        penanda = catat("diarize", penanda)
+        print(f"Pipeline diarization selesai ({waktu_tahap['diarize']:.1f} detik).")
 
         # 3. Pra-pemrosesan Teks (tahap [9])
         progress(0.85, desc="Pra-pemrosesan teks & pemetaan dialog...")
@@ -361,20 +371,14 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, mo
             teks_aturan = susun_teks_pembicara(segmen_terstruktur, target)
             label = target or "seluruh pembicara"
 
-            # Koreksi salah dengar ASR oleh LLM. Teks sebelum koreksi tetap
-            # ditampilkan berdampingan: koreksi yang tidak terlihat tidak dapat
-            # diaudit guru, dan justru menyamarkan kesalahan transkripsi.
-            progress(0.88, desc="Mengoreksi salah dengar ASR dengan LLM...")
-            print("Mulai koreksi salah dengar ASR...")
+            # Koreksi salah dengar ASR berbasis aturan (Double Metaphone +
+            # jarak Levenshtein atas bentuk fonetik). Teks sebelum koreksi
+            # tetap ditampilkan berdampingan: koreksi yang tidak terlihat tidak
+            # dapat diaudit guru, dan justru menyamarkan kesalahan transkripsi.
+            progress(0.88, desc="Mengoreksi salah dengar ASR...")
+            print("Mulai koreksi salah dengar ASR (berbasis aturan)...")
 
-            def lapor_koreksi(i, n):
-                # Tahap ini puluhan detik per potongan; tanpa kemajuan yang
-                # terlihat, aplikasi tampak menggantung.
-                progress(0.88 + 0.06 * (i - 1) / max(n, 1),
-                         desc=f"Mengoreksi salah dengar ASR ({i}/{n})...")
-                print(f"   - potongan {i}/{n}...")
-
-            koreksi = koreksi_asr_llm(teks_aturan, topik, lapor=lapor_koreksi)
+            koreksi = koreksi_asr_aturan(teks_aturan, topik)
             teks_siswa = koreksi["teks"]
             if koreksi["diterapkan"]:
                 teks_llm = teks_siswa
@@ -386,8 +390,8 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, mo
 
             nlp_result = (
                 f"=== TEKS SEBELUM KOREKSI ({label}) ===\n\n{teks_aturan}\n\n"
-                f"=== TEKS SETELAH KOREKSI LLM ===\n\n"
-                f"{teks_siswa if koreksi['diterapkan'] else '(koreksi tidak diterapkan)'}\n\n"
+                f"=== TEKS SETELAH KOREKSI ===\n\n"
+                f"{teks_siswa if koreksi['diterapkan'] else '(tidak ada kata yang perlu dikoreksi)'}\n\n"
                 f"=== KATA YANG DIKOREKSI ===\n{daftar_ubah}\n\n"
                 f"=== INFORMASI ===\n"
                 f"Status koreksi: {koreksi['catatan']}\n"
@@ -395,7 +399,9 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, mo
                 f"Yang dinilai sistem: teks "
                 f"{'SETELAH' if koreksi['diterapkan'] else 'SEBELUM'} koreksi."
             )
-        print(f"Pra-pemrosesan teks selesai. Target: {target or 'semua pembicara'}")
+        penanda = catat("text", penanda)
+        print(f"Pra-pemrosesan teks selesai ({waktu_tahap['text']:.2f} detik). "
+              f"Target: {target or 'semua pembicara'}")
 
         # 4. Evaluasi LLM berbasis rubrik
         # Kegagalan evaluasi tidak boleh membatalkan transkripsi yang sudah
@@ -426,6 +432,9 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, mo
             except EvaluationError as e:
                 eval_result = f"❌ EVALUASI GAGAL: {e}"
                 print(eval_result)
+        # Dicatat di luar percabangan supaya evaluasi yang gagal maupun yang
+        # dilewati tetap punya angka waktu, bukan lubang kosong di data.
+        penanda = catat("evaluate", penanda)
 
         # 5. Penyimpanan ke basis data
         # Kegagalan penyimpanan tidak boleh membuang hasil yang sudah dihitung:
@@ -457,6 +466,7 @@ def asr_pipeline(audio_file, num_speakers_val, topik="", pembicara_dinilai=1, mo
                     # yatim di disk setiap kali sesi login tidak terdeteksi.
                     filepath=simpan_rekaman(audio_file),
                     waktu_proses=round(time.perf_counter() - mulai_proses, 1),
+                    waktu_tahap=waktu_tahap,
                 )
                 print(f"Hasil tersimpan ke basis data (id_audio={id_audio}).")
                 eval_result += f"\n\n✅ Hasil tersimpan ke histori (ID: {id_audio})."
@@ -495,16 +505,89 @@ def tema_modul():
     )
 
 
+# Gaya modul. Memakai token yang sama dengan shell FastAPI (_tokens.css) agar
+# modul di dalam iframe terbaca sebagai satu aplikasi, bukan halaman tempelan.
+# Kelas yang dijadikan sasaran adalah kelas yang KITA beri sendiri lewat
+# elem_classes/elem_id, bukan kelas internal Gradio, supaya gaya ini tidak
+# rusak diam-diam saat Gradio diperbarui.
 CSS_SELARAS = """
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap');
-.gradio-container { background: #f6f3ec !important; }
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
+
+:root {
+    --kertas: #f6f3ec;
+    --kartu: #fffdf8;
+    --tinta: #1c2a24;
+    --pinus: #1e5c46;
+    --redup: #6d7a70;
+    --garis: #e3ddcf;
+    --amber: #c8722a;
+    --amber-muda: #f7e8d6;
+}
+
+.gradio-container { background: var(--kertas) !important; max-width: 100% !important; }
+
+/* Kepala modul */
 #judul-modul h1 {
     font-family: 'Fraunces', Georgia, serif !important;
-    font-weight: 600;
-    color: #1c2a24;
-    margin-bottom: 0.2rem;
+    font-weight: 700;
+    font-size: 1.6rem;
+    color: var(--tinta);
+    margin: 0 0 0.25rem;
 }
-#judul-modul p { color: #6d7a70; margin-top: 0; }
+#judul-modul p { color: var(--redup); margin: 0; font-size: 0.92rem; }
+
+/* Panel kiri dan kanan dijadikan kartu agar dua wilayahnya terbaca terpisah */
+#panel-masukan, #panel-hasil {
+    background: var(--kartu) !important;
+    border: 1px solid var(--garis) !important;
+    border-radius: 14px !important;
+    padding: 1.1rem 1.15rem !important;
+    box-shadow: 0 1px 2px rgba(28,42,36,.05), 0 4px 16px rgba(28,42,36,.04);
+    align-self: flex-start;
+}
+
+/* Penanda langkah. Bernomor karena isian ini memang berurutan:
+   rekaman dulu, baru topik, baru diproses. */
+.langkah p {
+    font-family: 'Spline Sans Mono', Consolas, monospace !important;
+    font-size: 0.66rem !important;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--redup) !important;
+    margin: 0.2rem 0 0.1rem !important;
+}
+
+/* Catatan peringatan tentang nomor pembicara */
+.catatan-awas {
+    background: var(--amber-muda);
+    border-left: 3px solid var(--amber);
+    border-radius: 0 8px 8px 0;
+    padding: 0.6rem 0.8rem !important;
+}
+.catatan-awas p { font-size: 0.8rem !important; line-height: 1.55; margin: 0 !important; }
+
+/* Tombol proses */
+#tombol-proses { font-weight: 600; letter-spacing: 0.01em; }
+
+/* Hasil penilaian */
+#hasil-penilaian h2 {
+    font-family: 'Fraunces', Georgia, serif !important;
+    color: var(--pinus) !important;
+    font-size: 1.25rem !important;
+    margin: 0 0 0.7rem !important;
+}
+#hasil-penilaian h3 {
+    font-size: 0.95rem !important;
+    color: var(--tinta) !important;
+    margin: 1.2rem 0 0.4rem !important;
+}
+#hasil-penilaian table { width: 100%; font-size: 0.88rem; }
+#hasil-penilaian td, #hasil-penilaian th { padding: 0.45rem 0.6rem !important; }
+#hasil-penilaian li { font-size: 0.87rem; line-height: 1.55; }
+
+/* Footer bawaan Gradio ("Use via API", "Settings") disembunyikan: modul ini
+   dipakai guru di dalam aplikasi, bukan sebagai demo yang berdiri sendiri. */
+footer { display: none !important; }
 """
 
 
@@ -517,8 +600,12 @@ def create_unified_app():
             elem_id="judul-modul",
         )
         
-        with gr.Row():
-            with gr.Column(scale=1):
+        with gr.Row(equal_height=False):
+            # elem_id, bukan elem_classes: pada Gradio 6 elem_classes pada
+            # gr.Column diterima tanpa keluhan tetapi tidak pernah sampai ke
+            # DOM, sehingga gayanya hilang diam-diam.
+            with gr.Column(scale=4, elem_id="panel-masukan"):
+                gr.Markdown("Langkah 1 — Rekaman", elem_classes="langkah")
                 # sources ditulis eksplisit agar tombol rekam tidak hilang bila
                 # nilai bawaan Gradio berubah di versi mendatang.
                 #
@@ -526,62 +613,92 @@ def create_unified_app():
                 # .webm, sedangkan validate_audio hanya menerima .wav/.mp3 --
                 # sehingga rekaman langsung ditolak sebelum sempat diproses.
                 audio_input = gr.Audio(
-                    label="Unggah atau Rekam Audio",
+                    label="Unggah berkas .wav/.mp3 atau rekam langsung",
                     sources=["upload", "microphone"],
                     type="filepath",
                     format="wav",
                 )
-                model_input = gr.Dropdown(
-                    choices=["tiny", "base", "small", "medium", "large"],
-                    value=WHISPER_MODEL if WHISPER_MODEL in ["tiny", "base", "small", "medium", "large"] else "medium",
-                    label="Model Whisper ASR",
-                    info="Pilih model Whisper yang digunakan untuk transkripsi."
-                )
+
+                gr.Markdown("Langkah 2 — Pertanyaan", elem_classes="langkah")
                 topik_input = gr.Textbox(
                     lines=3,
                     label="Topik / Pertanyaan",
                     placeholder="Contoh: Jelaskan proses fotosintesis pada tumbuhan.",
-                    info="Dasar penilaian oleh sistem. Wajib diisi untuk memperoleh skor."
-                )
-                num_speakers_input = gr.Slider(minimum=0, maximum=MAX_SPEAKERS, step=1, value=0, label=f"Jumlah Pembicara (0 = Otomatis, maks. {MAX_SPEAKERS})")
-                pembicara_input = gr.Slider(
-                    minimum=0, maximum=MAX_SPEAKERS, step=1, value=1,
-                    label="Pembicara yang Dinilai",
-                    info="Nomor pembicara yang merupakan siswa. Isi 0 untuk menilai seluruh pembicara."
-                )
-                submit_btn = gr.Button("🚀 Proses Audio", variant="primary")
-
-            with gr.Column(scale=2):
-                tampilan_dropdown = gr.Dropdown(
-                    choices=[
-                        "Penilaian & Rubrik",
-                        "Dialog Berdasarkan Pembicara",
-                        "Transkrip Penuh",
-                        "Teks Pra-pemrosesan"
-                    ],
-                    value="Penilaian & Rubrik",
-                    label="Pilih Tampilan Hasil Transkrip",
-                    info="Pilih jenis hasil analisis yang ingin ditampilkan."
+                    info="Dasar penilaian sistem. Wajib diisi untuk memperoleh skor."
                 )
 
-                eval_out = gr.Textbox(lines=16, label="Skor & Umpan Balik (Rubrik)", visible=True)
-                dialogue_out = gr.Textbox(lines=16, label="Dialog Berdasarkan Pembicara", visible=False)
-                full_text_out = gr.Textbox(lines=16, label="Hasil Transkrip Lengkap", visible=False)
-                nlp_out = gr.Textbox(lines=16, label="Teks Bersih yang Dinilai Sistem", visible=False)
+                # Pengaturan teknis dilipat: guru cukup mengisi rekaman dan
+                # pertanyaan, sementara pilihan model dan nomor pembicara jarang
+                # diubah dan hanya membuat panel penuh bila selalu terbuka.
+                with gr.Accordion("Pengaturan lanjutan", open=False):
+                    model_input = gr.Dropdown(
+                        choices=["tiny", "base", "small", "medium", "large"],
+                        value=WHISPER_MODEL if WHISPER_MODEL in ["tiny", "base", "small", "medium", "large"] else "medium",
+                        label="Model Whisper ASR",
+                        info="Model besar lebih akurat tetapi jauh lebih lambat. "
+                             "Pakai satu ukuran yang sama untuk seluruh pengambilan data."
+                    )
+                    num_speakers_input = gr.Slider(
+                        minimum=0, maximum=MAX_SPEAKERS, step=1, value=0,
+                        label="Jumlah Pembicara",
+                        info=f"0 = deteksi otomatis. Maksimum {MAX_SPEAKERS}."
+                    )
+                    pembicara_input = gr.Slider(
+                        minimum=0, maximum=MAX_SPEAKERS, step=1, value=1,
+                        label="Pembicara yang Dinilai (tebakan awal)",
+                        info="0 = gabungkan seluruh pembicara."
+                    )
+                    # Peringatannya dipisahkan dari `info` slider: sebagai satu
+                    # paragraf panjang di bawah label, teks ini justru tidak
+                    # terbaca. Padahal menilai orang yang keliru tetap
+                    # menghasilkan skor yang tampak wajar, sehingga risikonya
+                    # harus terlihat, bukan terselip.
+                    gr.Markdown(
+                        "**Nomor ini masih tebakan.** Urutan pembicara baru diketahui "
+                        "setelah rekaman dianalisis, dan yang bicara lebih dahulu sering "
+                        "kali guru. Periksa ulang di menu **Histori** — di sana rekaman "
+                        "dapat diputar, peran tiap pembicara ditetapkan, dan penilaian "
+                        "diulang bila nomornya keliru.\n\n"
+                        "Mengisi 0 membuat ucapan guru ikut dinilai dan menaikkan skor siswa.",
+                        elem_classes="catatan-awas",
+                    )
 
-        def ganti_tampilan_hasil(pilihan):
-            return (
-                gr.update(visible=(pilihan == "Penilaian & Rubrik")),
-                gr.update(visible=(pilihan == "Dialog Berdasarkan Pembicara")),
-                gr.update(visible=(pilihan == "Transkrip Penuh")),
-                gr.update(visible=(pilihan == "Teks Pra-pemrosesan")),
-            )
+                submit_btn = gr.Button(
+                    "Proses Audio", variant="primary", size="lg", elem_id="tombol-proses"
+                )
 
-        tampilan_dropdown.change(
-            fn=ganti_tampilan_hasil,
-            inputs=[tampilan_dropdown],
-            outputs=[eval_out, dialogue_out, full_text_out, nlp_out]
-        )
+            with gr.Column(scale=6, elem_id="panel-hasil"):
+                # Tab menggantikan dropdown pemilih tampilan. Selain lebih lazim,
+                # ia menghapus penyembunyian/penampilan manual empat kotak teks
+                # beserta penangan peristiwanya -- satu sumber kerumitan hilang.
+                with gr.Tabs():
+                    with gr.Tab("Penilaian"):
+                        eval_out = gr.Markdown(
+                            value=(
+                                "Hasil penilaian akan muncul di sini setelah audio diproses.\n\n"
+                                "Sistem menilai empat indikator rubrik pada skala 1–5, "
+                                "disertai alasan tiap skor dan umpan balik untuk siswa."
+                            ),
+                            elem_id="hasil-penilaian",
+                        )
+                    with gr.Tab("Dialog per Pembicara"):
+                        dialogue_out = gr.Textbox(
+                            lines=20, show_label=False,
+                            placeholder="Dialog yang sudah dipisahkan menurut pembicara "
+                                        "akan muncul di sini.",
+                        )
+                    with gr.Tab("Transkrip Penuh"):
+                        full_text_out = gr.Textbox(
+                            lines=20, show_label=False,
+                            placeholder="Transkrip mentah Whisper untuk seluruh "
+                                        "pembicara akan muncul di sini.",
+                        )
+                    with gr.Tab("Pra-pemrosesan Teks"):
+                        nlp_out = gr.Textbox(
+                            lines=20, show_label=False,
+                            placeholder="Teks sebelum dan sesudah koreksi salah dengar, "
+                                        "beserta daftar kata yang berubah.",
+                        )
 
         submit_btn.click(
             fn=asr_pipeline,

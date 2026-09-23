@@ -443,6 +443,13 @@ def _koreksi_bertingkat(asli, topik, pemanggil, sisa_belah=2):
 def koreksi_asr_llm(teks, topik=None, pemanggil=None, lapor=None):
     """Memperbaiki kata yang salah didengar ASR dengan bantuan LLM.
 
+    TIDAK LAGI DIPAKAI PIPELINE. Sejak koreksi berbasis aturan
+    (`koreksi_fonetik.koreksi_asr_aturan`) diterapkan, fungsi ini
+    DIPERTAHANKAN DENGAN SENGAJA sebagai pembanding: proposal §3.2.5.3
+    mewajibkan pengukuran Word Error Rate, dan perbandingan dua metode koreksi
+    hanya mungkin bila keduanya masih dapat dijalankan. Jangan dihapus sebelum
+    pengukuran itu selesai dan hasilnya dilaporkan.
+
     Teks dipecah menjadi potongan pendek (lihat `BATAS_KATA_POTONG`) dan setiap
     potongan dikoreksi serta diperiksa kewajarannya sendiri-sendiri. Potongan
     yang koreksinya ditolak atau gagal dihubungi dikembalikan ke teks aslinya,
