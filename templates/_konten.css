@@ -1,63 +1,70 @@
 /* ============================================================
-   Gaya bersama untuk halaman konten di dalam iframe
-   (Histori, Penilaian, Detail). Disertakan lewat tag include Jinja
-   agar ketiga halaman tidak menyalin CSS yang sama.
-   Token warna/huruf berasal dari _tokens.css (disertakan lebih
-   dahulu oleh masing-masing halaman).
+   Gaya Bersama Halaman Konten (Histori, Penilaian, Detail) - Apple HIG
    ============================================================ */
 body {
     background: var(--kertas);
-    padding: 1.8rem;
+    padding: 1.8rem 2rem;
 }
 
 .container {
     background: var(--kartu);
-    padding: 1.9rem 2rem;
+    padding: 2rem 2.2rem;
     border: 1px solid var(--garis);
-    border-radius: 14px;
+    border-radius: var(--radius-lg);
     box-shadow: var(--bayang);
 }
 
 h1 {
     font-family: var(--f-display);
-    font-weight: 600;
+    font-weight: 700;
     font-size: 1.4rem;
+    letter-spacing: -0.025em;
     margin: 0 0 0.35rem;
+    color: var(--tinta);
 }
 h2 {
     font-family: var(--f-display);
     font-weight: 600;
-    font-size: 1.1rem;
+    font-size: 1.15rem;
+    letter-spacing: -0.02em;
     margin: 0 0 0.8rem;
+    color: var(--tinta);
 }
 .subjudul {
     color: var(--redup);
     margin: 0 0 1.6rem;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
 }
 
-/* ---------- Tabel bergaya lembar penilaian ---------- */
+/* ---------- Tabel Bergaya macOS List View ---------- */
 table {
     width: 100%;
-    border-collapse: collapse;
-    margin-top: 0.4rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 0.6rem;
+    border: 1px solid var(--garis);
+    border-radius: var(--radius-md);
+    overflow: hidden;
 }
 th, td {
-    padding: 0.75rem 0.9rem;
+    padding: 0.75rem 1rem;
     text-align: left;
-    vertical-align: top;
+    vertical-align: middle;
     border-bottom: 1px solid var(--garis);
-    font-size: 0.92rem;
+    font-size: 0.88rem;
+}
+tr:last-child td {
+    border-bottom: none;
 }
 thead th {
-    font-family: var(--f-mono);
-    font-size: 0.66rem;
-    font-weight: 500;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
+    font-family: var(--f-body);
+    font-size: 0.75rem;
+    font-weight: 600;
     color: var(--redup);
-    border-bottom: 2px solid var(--garis-tegas);
-    background: transparent;
+    letter-spacing: 0;
+    text-transform: none;
+    border-bottom: 1px solid var(--garis);
+    background: rgba(0, 0, 0, 0.02);
 }
 tbody th {
     font-weight: 600;
@@ -65,15 +72,26 @@ tbody th {
     width: 11rem;
     background: transparent;
 }
-tbody tr:hover { background: rgba(30, 92, 70, 0.035); }
+tbody tr {
+    transition: background-color 0.12s ease;
+}
+tbody tr:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
 
-a { color: var(--pinus); font-weight: 600; text-decoration: none; }
-a:hover { text-decoration: underline; }
+a {
+    color: var(--pinus);
+    font-weight: 500;
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}
 
-/* ---------- Keadaan kosong ---------- */
+/* ---------- Keadaan Kosong (Empty States) ---------- */
 .kosong {
     text-align: center;
-    padding: 3.2rem 1rem;
+    padding: 3.5rem 1rem;
     color: var(--redup);
     line-height: 1.6;
 }
@@ -81,27 +99,35 @@ a:hover { text-decoration: underline; }
     display: block;
     font-family: var(--f-display);
     color: var(--tinta);
-    font-size: 1.1rem;
-    margin-bottom: 0.4rem;
-}
-
-/* ---------- Lencana status ---------- */
-.badge {
-    display: inline-block;
-    font-family: var(--f-mono);
-    padding: 0.18rem 0.65rem;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-}
-.badge-selesai  { background: var(--hijau-ok-bg); color: var(--hijau-ok); }
-.badge-diproses { background: var(--kuning-proses-bg); color: var(--kuning-proses); }
-
-/* ---------- Skor ---------- */
-.skor {
-    font-family: var(--f-mono);
+    font-size: 1.08rem;
     font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+/* ---------- Lencana Status (Pill Badges) ---------- */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--f-body);
+    padding: 0.22rem 0.65rem;
+    border-radius: 99px;
+    font-size: 0.74rem;
+    font-weight: 500;
+}
+.badge-selesai {
+    background: var(--hijau-ok-bg);
+    color: var(--hijau-ok);
+}
+.badge-diproses {
+    background: var(--kuning-proses-bg);
+    color: var(--kuning-proses);
+}
+
+/* ---------- Skor & Evaluasi ---------- */
+.skor {
+    font-family: var(--f-body);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
     color: var(--pinus);
     white-space: nowrap;
 }
@@ -109,84 +135,116 @@ a:hover { text-decoration: underline; }
     color: var(--redup);
     font-style: italic;
     font-weight: 400;
-    font-size: 0.88rem;
+    font-size: 0.85rem;
 }
 
 .umpan-balik {
     max-width: 28rem;
-    font-size: 0.88rem;
+    font-size: 0.86rem;
     line-height: 1.55;
+    color: var(--redup-tua);
 }
 
-/* ---------- Tombol aksi (sunting / hapus) ---------- */
+/* ---------- Tombol Aksi macOS ---------- */
 .tombol {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-family: var(--f-body);
-    font-size: 0.83rem;
-    font-weight: 600;
-    padding: 0.42rem 0.9rem;
-    border-radius: 8px;
-    border: 1px solid var(--garis-tegas);
-    background: var(--kartu);
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 0.38rem 0.85rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--garis);
+    background: rgba(0, 0, 0, 0.04);
     color: var(--tinta);
     cursor: pointer;
     text-decoration: none;
+    transition: all 0.15s ease;
 }
-.tombol:hover { background: var(--pinus-muda); text-decoration: none; }
+.tombol:hover {
+    background: rgba(0, 0, 0, 0.08);
+    text-decoration: none;
+}
 
 .tombol-utama {
     background: var(--pinus);
     border-color: var(--pinus);
     color: #fff;
+    font-weight: 600;
 }
-.tombol-utama:hover { background: var(--pinus-tua); }
+.tombol-utama:hover {
+    background: var(--pinus-tua);
+    border-color: var(--pinus-tua);
+}
 
-/* Warna merah dipakai HANYA untuk aksi yang tidak dapat dibatalkan, supaya
-   guru dapat mengenali penghapusan sebelum menekannya. */
 .tombol-bahaya {
     background: var(--merah-bg);
-    border-color: var(--merah);
+    border-color: rgba(255, 59, 48, 0.2);
     color: var(--merah);
 }
-.tombol-bahaya:hover { background: var(--merah); color: #fff; }
+.tombol-bahaya:hover {
+    background: var(--merah);
+    border-color: var(--merah);
+    color: #fff;
+}
 
-.aksi { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-.aksi form { display: inline; margin: 0; }
+.aksi {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.aksi form {
+    display: inline;
+    margin: 0;
+}
 
-/* ---------- Isian sunting ---------- */
+/* ---------- Form Input Controls ---------- */
 .isian, textarea.isian {
     width: 100%;
     font-family: var(--f-body);
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     color: var(--tinta);
-    background: var(--kartu);
+    background: #ffffff;
     border: 1px solid var(--garis-tegas);
-    border-radius: 8px;
-    padding: 0.6rem 0.75rem;
-    line-height: 1.6;
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.75rem;
+    line-height: 1.55;
     resize: vertical;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
-.isian:focus { outline: 2px solid var(--pinus); outline-offset: 1px; }
+.isian:focus, textarea.isian:focus {
+    outline: none;
+    border-color: var(--pinus);
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.18);
+}
 .label-isian {
     display: block;
-    font-family: var(--f-mono);
-    font-size: 0.68rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--redup);
+    font-family: var(--f-body);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--tinta);
     margin: 0 0 0.35rem;
 }
 
-/* ---------- Pemutar audio ---------- */
-audio { width: 100%; max-width: 34rem; margin-top: 0.3rem; }
+/* ---------- Pemutar Audio ---------- */
+audio {
+    width: 100%;
+    max-width: 34rem;
+    margin-top: 0.3rem;
+}
 
-.indikator { font-size: 0.85rem; }
+.indikator {
+    font-size: 0.84rem;
+}
 .indikator span {
     display: inline-block;
     margin: 0 0.6rem 0.2rem 0;
     white-space: nowrap;
 }
 .indikator strong {
-    font-family: var(--f-mono);
+    font-family: var(--f-body);
+    font-weight: 600;
     color: var(--pinus);
 }

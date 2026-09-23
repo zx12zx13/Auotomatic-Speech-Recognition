@@ -1,47 +1,57 @@
 /* ============================================================
-   Token desain bersama - "Lembar Ukur Akademik"
-   Kertas hangat + tinta pinus + aksen amber. Angka memakai huruf
-   mono agar terbaca sebagai instrumen pengukuran, bukan dekorasi.
-   Disertakan lewat tag include Jinja agar seluruh halaman konsisten.
-   CATATAN: berkas ini dibaca Jinja, jadi jangan menulis kurung kurawal
-   ganda atau tanda blok Jinja secara harfiah di dalam komentar.
+   Token Desain Antarmuka - Apple Human Interface Guidelines
+   Prinsip: Kejelasan (Clarity), Kedalaman (Depth), Kesatuan (Deference).
+   Tipografi modern sans-serif dengan kanvas netral macOS, kartu
+   elevasi murni, dan aksen warna sistem Apple yang tenang.
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Schibsted+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    /* Warna inti */
-    --kertas: #f6f3ec;          /* latar utama, kertas hangat */
-    --kartu: #fffdf8;           /* permukaan kartu */
-    --tinta: #1c2a24;           /* teks utama, hijau-hitam */
-    --pinus: #1e5c46;           /* warna utama (primary) */
-    --pinus-tua: #14402f;       /* hover / penekanan */
-    --pinus-muda: #e7efe9;      /* latar lembut kehijauan */
-    --amber: #c8722a;           /* aksen hangat */
-    --amber-muda: #f7e8d6;      /* latar aksen lembut */
-    --redup: #6d7a70;           /* teks sekunder */
-    --garis: #e3ddcf;           /* garis batas hangat */
-    --garis-tegas: #cfc7b4;
+    /* Kanvas & Permukaan (Apple System Backgrounds) */
+    --kertas: #f5f5f7;          /* systemGroupedBackground: kanvas netral bersih */
+    --kartu: #ffffff;           /* secondarySystemGroupedBackground: kartu putih murni */
+    --tinta: #1d1d1f;           /* label: teks utama dekat hitam */
+    --redup: #86868b;           /* secondaryLabel: teks sekunder */
+    --redup-tua: #515154;       /* tertiaryLabel untuk paragraf penjelasan */
+    
+    /* Garis Batas & Pembatas (Separators) */
+    --garis: rgba(0, 0, 0, 0.08);      /* separator halus */
+    --garis-tegas: rgba(0, 0, 0, 0.14);/* garis kontrol / input */
 
-    /* Sidebar gelap */
-    --malam: #14231d;
-    --malam-2: #1b2f27;
-    --krem: #ede7d9;
+    /* Warna Aksen Sistem (Apple System Colors) */
+    --pinus: #0071e3;           /* Apple System Blue (warna primer) */
+    --pinus-tua: #0051a8;       /* Blue Active / Hover */
+    --pinus-muda: rgba(0, 113, 227, 0.08); /* Blue Tint Background */
+    --amber: #f56300;           /* Apple System Orange */
+    --amber-muda: rgba(245, 99, 0, 0.08);
+    
+    /* Sidebar macOS (Clean translucent / neutral) */
+    --sidebar-bg: #f8f9fa;
+    --sidebar-border: rgba(0, 0, 0, 0.08);
+    --sidebar-text: #1d1d1f;
+    --sidebar-text-muted: #6e6e73;
+    --sidebar-active-bg: rgba(0, 113, 227, 0.10);
+    --sidebar-active-text: #0071e3;
 
-    /* Semantik */
-    --hijau-ok: #2c7a4b;
-    --hijau-ok-bg: #e2f2e6;
-    --kuning-proses: #8a5a00;
-    --kuning-proses-bg: #fbf0d9;
-    --merah: #a8362e;
-    --merah-bg: #f8e5e2;
+    /* Status Semantik */
+    --hijau-ok: #34c759;
+    --hijau-ok-bg: rgba(52, 199, 89, 0.12);
+    --kuning-proses: #ff9f0a;
+    --kuning-proses-bg: rgba(255, 159, 10, 0.12);
+    --merah: #ff3b30;
+    --merah-bg: rgba(255, 59, 48, 0.10);
 
-    /* Tipografi */
-    --f-display: 'Fraunces', Georgia, serif;
-    --f-body: 'Schibsted Grotesk', 'Segoe UI', sans-serif;
-    --f-mono: 'Spline Sans Mono', Consolas, monospace;
+    /* Tipografi Standar Apple (SF Pro-like via Inter / System Stack) */
+    --f-display: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    --f-body: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    --f-mono: 'SF Mono', ui-monospace, Menlo, Monaco, Consolas, monospace;
 
-    --bayang: 0 1px 2px rgba(28, 42, 36, 0.06), 0 4px 16px rgba(28, 42, 36, 0.05);
-    --bayang-besar: 0 2px 4px rgba(28, 42, 36, 0.07), 0 12px 32px rgba(28, 42, 36, 0.10);
+    /* Elevasi & Sudut Lengkung (Apple Smooth Radius) */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --bayang: 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.03);
+    --bayang-besar: 0 4px 16px rgba(0, 0, 0, 0.06), 0 16px 36px rgba(0, 0, 0, 0.06);
 }
 
 * { box-sizing: border-box; }
@@ -51,19 +61,21 @@ body {
     color: var(--tinta);
     margin: 0;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-/* Tanda gelombang suara - identitas visual sistem ASR */
+/* Gelombang suara ASR - gaya SF Symbol minimalis */
 .gelombang {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    height: 22px;
+    height: 20px;
 }
 .gelombang i {
     width: 3px;
-    border-radius: 2px;
-    background: var(--amber);
-    height: calc(22px * var(--t, 0.5));
+    border-radius: 99px;
+    background: var(--pinus);
+    height: calc(20px * var(--t, 0.5));
+    transition: height 0.2s ease;
 }
-.gelombang i:nth-child(odd) { background: var(--pinus); }
+.gelombang i:nth-child(even) { background: #34c759; }

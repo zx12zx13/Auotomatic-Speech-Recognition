@@ -8,10 +8,16 @@
         {% include "_tokens.css" %}
         {% include "_shell.css" %}
 
+        html, body {
+            height: 100vh;
+            overflow: hidden;
+        }
         .content {
             padding: 0;
             flex-grow: 1;
-            min-height: 0; /* wajib agar iframe tidak memaksa tinggi berlebih */
+            height: calc(100vh - 64px);
+            min-height: 0;
+            overflow: hidden;
         }
         iframe {
             width: 100%;
@@ -24,16 +30,30 @@
 <body>
     <aside class="sidebar">
         <div class="logo">
-            <span class="gelombang" aria-hidden="true">
-                <i style="--t:.4"></i><i style="--t:.8"></i><i style="--t:1"></i><i style="--t:.55"></i><i style="--t:.75"></i>
-            </span>
+            <div class="logo-icon-wrap">
+                <span class="gelombang" aria-hidden="true">
+                    <i style="--t:.4"></i><i style="--t:.8"></i><i style="--t:1"></i><i style="--t:.55"></i><i style="--t:.75"></i>
+                </span>
+            </div>
             <div class="nama">Evaluasi Lisan<small>ASR &middot; Rubrik LLM</small></div>
         </div>
         <nav class="sidebar-nav">
-            <a href="/" class="{{ 'active' if active_page == 'dashboard' else '' }}"><span class="icon">&#9632;</span> Dashboard</a>
-            <a href="/app/analisis" class="{{ 'active' if active_page == 'analisis' else '' }}"><span class="icon">&#9835;</span> Analisis Audio</a>
-            <a href="/app/histori" class="{{ 'active' if active_page == 'histori' else '' }}"><span class="icon">&#9776;</span> Histori</a>
-            <a href="/app/nilai" class="{{ 'active' if active_page == 'nilai' else '' }}"><span class="icon">&#10003;</span> Penilaian</a>
+            <a href="/" class="{{ 'active' if active_page == 'dashboard' else '' }}">
+                <svg class="nav-svg" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+                Dashboard
+            </a>
+            <a href="/app/analisis" class="{{ 'active' if active_page == 'analisis' else '' }}">
+                <svg class="nav-svg" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                Analisis Audio
+            </a>
+            <a href="/app/histori" class="{{ 'active' if active_page == 'histori' else '' }}">
+                <svg class="nav-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Histori
+            </a>
+            <a href="/app/nilai" class="{{ 'active' if active_page == 'nilai' else '' }}">
+                <svg class="nav-svg" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                Penilaian
+            </a>
         </nav>
         <div class="user-profile">
             <div class="avatar">{{ user.username[0] | upper }}</div>
@@ -46,7 +66,18 @@
 
     <div class="main-wrapper">
         <header class="header">
-            <h1>{{ title }}</h1>
+            <div>
+                <h1>{{ title }}</h1>
+                <div class="sub-header-desc">
+                    {% if active_page == 'analisis' %}
+                    Transkripsi otomatis Whisper ASR, pemisahan pembicara Pyannote, dan penilaian rubrik LLM.
+                    {% elif active_page == 'histori' %}
+                    Arsip berkas rekaman lisan, transkrip, dan riwayat evaluasi per sesi.
+                    {% elif active_page == 'nilai' %}
+                    Rekapitulasi skor indikator rubrik akademik dan umpan balik siswa.
+                    {% endif %}
+                </div>
+            </div>
             <form class="logout-form" action="/logout" method="post">
                 <button type="submit">Keluar</button>
             </form>

@@ -9,140 +9,202 @@
         {% include "_shell.css" %}
 
         .content {
-            padding: 2.2rem;
+            padding: 2.2rem 2.4rem;
             overflow-y: auto;
         }
 
         .sapaan {
-            margin: 0 0 1.8rem;
+            margin: 0 0 2rem;
         }
         .sapaan h2 {
             font-family: var(--f-display);
-            font-weight: 600;
-            font-size: 1.7rem;
-            margin: 0 0 0.3rem;
+            font-weight: 700;
+            font-size: 1.6rem;
+            letter-spacing: -0.025em;
+            margin: 0 0 0.35rem;
+            color: var(--tinta);
         }
         .sapaan p {
             margin: 0;
             color: var(--redup);
-            font-size: 0.95rem;
+            font-size: 0.92rem;
         }
 
-        /* ---------- Kartu statistik ---------- */
+        /* ---------- Kartu Statistik (Apple Metrics) ---------- */
         .info-cards {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1.1rem;
             margin-bottom: 2.2rem;
         }
         .info-card {
             background: var(--kartu);
             border: 1px solid var(--garis);
-            border-radius: 14px;
-            padding: 1.2rem 1.3rem 1.1rem;
+            border-radius: var(--radius-md);
+            padding: 1.25rem 1.4rem;
             box-shadow: var(--bayang);
+            transition: border-color 0.15s ease;
+        }
+        .info-card:hover {
+            border-color: var(--garis-tegas);
         }
         .info-card h3 {
-            margin: 0 0 0.6rem;
-            font-family: var(--f-mono);
-            font-size: 0.66rem;
+            margin: 0 0 0.65rem;
+            font-family: var(--f-body);
+            font-size: 0.82rem;
             font-weight: 500;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
             color: var(--redup);
+            letter-spacing: -0.01em;
+            text-transform: none;
         }
         .info-card .value {
-            font-family: var(--f-mono);
-            font-size: 1.9rem;
-            font-weight: 600;
+            font-family: var(--f-display);
+            font-size: 2.1rem;
+            font-weight: 700;
+            letter-spacing: -0.035em;
             color: var(--tinta);
             margin: 0;
-            line-height: 1;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
         }
         .info-card .value small {
-            font-size: 0.85rem;
-            font-weight: 400;
+            font-size: 0.88rem;
+            font-weight: 500;
             color: var(--redup);
+            letter-spacing: normal;
         }
 
-        /* ---------- Kartu modul ---------- */
+        /* ---------- Kartu Modul ---------- */
         .module-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.1rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.2rem;
         }
         .module-card {
             position: relative;
             background: var(--kartu);
             border: 1px solid var(--garis);
-            border-radius: 14px;
-            padding: 1.5rem 1.5rem 1.3rem;
+            border-radius: var(--radius-lg);
+            padding: 1.6rem 1.6rem 1.4rem;
             box-shadow: var(--bayang);
             display: flex;
             flex-direction: column;
             text-decoration: none;
             color: inherit;
-            overflow: hidden;
-            transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
-        }
-        .module-card::before {
-            content: "";
-            position: absolute;
-            inset: 0 auto 0 0;
-            width: 5px;
-            background: var(--pinus);
-            opacity: 0.85;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .module-card:hover {
-            transform: translateY(-3px);
+            transform: translateY(-2px);
             box-shadow: var(--bayang-besar);
-            border-color: var(--garis-tegas);
+            border-color: rgba(0, 113, 227, 0.25);
         }
-        .module-card .nomor {
-            font-family: var(--f-mono);
-            font-size: 0.68rem;
-            letter-spacing: 0.14em;
+        .module-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .module-icon-wrap {
+            width: 42px;
+            height: 42px;
+            border-radius: var(--radius-sm);
+            background: rgba(0, 113, 227, 0.08);
+            color: var(--pinus);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .module-card:nth-child(2) .module-icon-wrap {
+            background: rgba(245, 99, 0, 0.08);
             color: var(--amber);
-            margin-bottom: 0.7rem;
+        }
+        .module-card:nth-child(3) .module-icon-wrap {
+            background: rgba(52, 199, 89, 0.12);
+            color: var(--hijau-ok);
+        }
+        .module-icon-wrap svg {
+            width: 22px;
+            height: 22px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .module-badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--redup);
+            background: rgba(0, 0, 0, 0.04);
+            padding: 3px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.02em;
         }
         .module-card h2 {
             font-family: var(--f-display);
             font-weight: 600;
-            font-size: 1.18rem;
-            margin: 0 0 0.55rem;
+            font-size: 1.15rem;
+            letter-spacing: -0.015em;
+            margin: 0 0 0.45rem;
+            color: var(--tinta);
         }
         .module-card p {
             margin: 0 0 1.4rem;
-            line-height: 1.6;
-            color: var(--redup);
-            font-size: 0.92rem;
+            line-height: 1.55;
+            color: var(--redup-tua);
+            font-size: 0.9rem;
             flex-grow: 1;
         }
         .module-card .buka {
-            font-weight: 700;
-            font-size: 0.9rem;
+            font-weight: 600;
+            font-size: 0.88rem;
             color: var(--pinus);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
-        .module-card .buka::after {
-            content: " \2192";
-            transition: margin-left 0.18s;
+        .module-card .buka svg {
+            width: 15px;
+            height: 15px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: transform 0.18s ease;
         }
-        .module-card:hover .buka::after { margin-left: 4px; }
+        .module-card:hover .buka svg {
+            transform: translateX(3px);
+        }
     </style>
 </head>
 <body>
     <aside class="sidebar">
         <div class="logo">
-            <span class="gelombang" aria-hidden="true">
-                <i style="--t:.4"></i><i style="--t:.8"></i><i style="--t:1"></i><i style="--t:.55"></i><i style="--t:.75"></i>
-            </span>
+            <div class="logo-icon-wrap">
+                <span class="gelombang" aria-hidden="true">
+                    <i style="--t:.4"></i><i style="--t:.8"></i><i style="--t:1"></i><i style="--t:.55"></i><i style="--t:.75"></i>
+                </span>
+            </div>
             <div class="nama">Evaluasi Lisan<small>ASR &middot; Rubrik LLM</small></div>
         </div>
         <nav class="sidebar-nav">
-            <a href="/" class="{{ 'active' if active_page == 'dashboard' else '' }}"><span class="icon">&#9632;</span> Dashboard</a>
-            <a href="/app/analisis" class="{{ 'active' if active_page == 'analisis' else '' }}"><span class="icon">&#9835;</span> Analisis Audio</a>
-            <a href="/app/histori" class="{{ 'active' if active_page == 'histori' else '' }}"><span class="icon">&#9776;</span> Histori</a>
-            <a href="/app/nilai" class="{{ 'active' if active_page == 'nilai' else '' }}"><span class="icon">&#10003;</span> Penilaian</a>
+            <a href="/" class="{{ 'active' if active_page == 'dashboard' else '' }}">
+                <svg class="nav-svg" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+                Dashboard
+            </a>
+            <a href="/app/analisis" class="{{ 'active' if active_page == 'analisis' else '' }}">
+                <svg class="nav-svg" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                Analisis Audio
+            </a>
+            <a href="/app/histori" class="{{ 'active' if active_page == 'histori' else '' }}">
+                <svg class="nav-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Histori
+            </a>
+            <a href="/app/nilai" class="{{ 'active' if active_page == 'nilai' else '' }}">
+                <svg class="nav-svg" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                Penilaian
+            </a>
         </nav>
         <div class="user-profile">
             <div class="avatar">{{ user.username[0] | upper }}</div>
@@ -183,11 +245,7 @@
                 <div class="info-card">
                     <h3>Skor Rata-rata</h3>
                     {% if stat.skala_tercampur %}
-                    {# Merata-ratakan skala 1-4 dan 1-5 menghasilkan angka yang
-                       tidak berarti apa-apa. Lebih baik tidak menampilkan angka
-                       daripada menampilkan angka yang menyesatkan. #}
-                    <p class="value"><small>skala tercampur
-                        ({{ stat.skala | join(' dan ') }}) &mdash; tidak dirata-ratakan</small></p>
+                    <p class="value"><small>skala tercampur ({{ stat.skala | join(' dan ') }})</small></p>
                     {% elif stat.rata_skor is not none %}
                     <p class="value">{{ "%.2f" | format(stat.rata_skor) }}
                         <small>/ {{ stat.skala[0] }}</small></p>
@@ -199,25 +257,40 @@
 
             <section class="module-grid">
                 <a class="module-card" href="/app/analisis">
-                    <span class="nomor">MODUL 01</span>
+                    <div class="module-card-header">
+                        <div class="module-icon-wrap">
+                            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                        </div>
+                        <span class="module-badge">Modul 01</span>
+                    </div>
                     <h2>Analisis Audio</h2>
                     <p>Unggah atau rekam respons lisan siswa. Sistem mentranskripsi,
                        memisahkan pembicara, lalu menilai jawaban berdasarkan rubrik.</p>
-                    <span class="buka">Buka modul</span>
+                    <span class="buka">Buka modul <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span>
                 </a>
                 <a class="module-card" href="/app/histori">
-                    <span class="nomor">MODUL 02</span>
+                    <div class="module-card-header">
+                        <div class="module-icon-wrap">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <span class="module-badge">Modul 02</span>
+                    </div>
                     <h2>Histori &amp; Arsip</h2>
                     <p>Seluruh proses yang pernah dijalankan: transkrip, dialog per
                        pembicara, dan hasil penilaiannya tersimpan di sini.</p>
-                    <span class="buka">Lihat arsip</span>
+                    <span class="buka">Lihat arsip <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span>
                 </a>
                 <a class="module-card" href="/app/nilai">
-                    <span class="nomor">MODUL 03</span>
+                    <div class="module-card-header">
+                        <div class="module-icon-wrap">
+                            <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                        </div>
+                        <span class="module-badge">Modul 03</span>
+                    </div>
                     <h2>Penilaian &amp; Umpan Balik</h2>
                     <p>Rekap skor rubrik per indikator beserta umpan balik naratif
                        untuk setiap jawaban siswa yang dinilai.</p>
-                    <span class="buka">Lihat penilaian</span>
+                    <span class="buka">Lihat penilaian <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span>
                 </a>
             </section>
         </main>
